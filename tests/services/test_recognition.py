@@ -12,8 +12,8 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 IMAGE_PATH = (
     BASE_DIR
-    / "app"
-    / "services"
+    / "tests"
+    / "fixtures"
     / "test.jpg"
 )
 
@@ -39,14 +39,22 @@ print(EMBEDDING_PATH)
 
 print()
 
+
 if not IMAGE_PATH.exists():
 
-    print("ERROR: Test image not found")
+    print(
+        "ERROR: Test image not found"
+    )
+
     exit()
+
 
 if not EMBEDDING_PATH.exists():
 
-    print("ERROR: Registered embedding not found")
+    print(
+        "ERROR: Registered embedding not found"
+    )
+
     exit()
 
 
@@ -57,6 +65,7 @@ if not EMBEDDING_PATH.exists():
 registered_embedding = np.load(
     str(EMBEDDING_PATH)
 )
+
 
 print(
     "Registered embedding length:",
@@ -69,19 +78,26 @@ print(
 # =========================================================
 
 print()
-print("Loading InsightFace...")
+print(
+    "Loading InsightFace..."
+)
+
 
 app = FaceAnalysis(
     name="buffalo_l",
     providers=["CPUExecutionProvider"]
 )
 
+
 app.prepare(
     ctx_id=0,
     det_size=(640, 640)
 )
 
-print("InsightFace loaded")
+
+print(
+    "InsightFace loaded"
+)
 
 
 # =========================================================
@@ -92,9 +108,13 @@ image = cv2.imread(
     str(IMAGE_PATH)
 )
 
+
 if image is None:
 
-    print("ERROR: Image could not be opened")
+    print(
+        "ERROR: Image could not be opened"
+    )
+
     exit()
 
 
@@ -102,12 +122,17 @@ if image is None:
 # DETECT FACE
 # =========================================================
 
-faces = app.get(image)
+faces = app.get(
+    image
+)
 
 
 if len(faces) == 0:
 
-    print("ERROR: No face detected")
+    print(
+        "ERROR: No face detected"
+    )
+
     exit()
 
 
@@ -121,14 +146,19 @@ if len(faces) > 1:
 
 
 print()
-print("Face detected successfully")
+print(
+    "Face detected successfully"
+)
 
 
 # =========================================================
 # GET NEW EMBEDDING
 # =========================================================
 
-new_embedding = faces[0].embedding
+new_embedding = (
+    faces[0].embedding
+)
+
 
 print(
     "New embedding length:",
@@ -154,7 +184,9 @@ similarity = np.dot(
 )
 
 
-similarity = float(similarity)
+similarity = float(
+    similarity
+)
 
 
 # =========================================================
@@ -163,25 +195,38 @@ similarity = float(similarity)
 
 threshold = 0.40
 
+
 print()
-print("======================================")
-print("FACE RECOGNITION TEST")
-print("======================================")
+print(
+    "======================================"
+)
+
+print(
+    "FACE RECOGNITION TEST"
+)
+
+print(
+    "======================================"
+)
+
 
 print(
     "Student ID:",
     "STU001"
 )
 
+
 print(
     "Similarity:",
     similarity
 )
 
+
 print(
     "Threshold:",
     threshold
 )
+
 
 if similarity >= threshold:
 
@@ -195,4 +240,7 @@ else:
         "Result: UNKNOWN"
     )
 
-print("======================================")
+
+print(
+    "======================================"
+)
