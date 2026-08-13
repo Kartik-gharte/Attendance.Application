@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from app.services.liveness import LivenessService
 from app.services.face_recognition import FaceRecognitionService
 
@@ -16,10 +14,14 @@ class AttendanceVerificationService:
         print("Attendance Verification Service ready")
 
     # =========================================================
-    # VERIFY FACE
+    # VERIFY FACE FROM IMAGE
     # =========================================================
 
-    def verify_face(self, image_path, student_id):
+    def verify_face(
+        self,
+        image_path,
+        student_id
+    ):
 
         print()
         print("======================================")
@@ -34,7 +36,29 @@ class AttendanceVerificationService:
         return result
 
     # =========================================================
-    # FINAL ATTENDANCE DECISION
+    # VERIFY FACE FROM CAMERA FRAME
+    # =========================================================
+
+    def verify_face_from_frame(
+        self,
+        frame,
+        student_id
+    ):
+
+        print()
+        print("======================================")
+        print("    LIVE FACE VERIFICATION")
+        print("======================================")
+
+        result = self.face_service.recognize_frame(
+            frame,
+            student_id
+        )
+
+        return result
+
+    # =========================================================
+    # CREATE FINAL ATTENDANCE RESULT
     # =========================================================
 
     def create_attendance_result(
@@ -55,22 +79,95 @@ class AttendanceVerificationService:
 
         return {
             "student_id": student_id,
+
             "liveness": (
                 "VERIFIED"
                 if liveness_verified
                 else "FAILED"
             ),
+
             "face": (
                 "MATCH"
                 if face_matched
                 else "UNKNOWN"
             ),
+
             "similarity": face_result.get(
                 "similarity"
             ),
+
+            "threshold": face_result.get(
+                "threshold"
+            ),
+
             "attendance": (
                 "VERIFIED"
                 if attendance_verified
                 else "REJECTED"
             )
         }
+
+    # =========================================================
+    # COMPLETE ATTENDANCE VERIFICATION
+    # =========================================================
+
+    def verify_attendance(
+        self,
+        frame,
+        student_id,
+        liveness_verified
+    ):
+
+        # -----------------------------------------------------
+        # LIVENESS CHECK
+        # -----------------------------------------------------
+
+        if not liveness_verified:
+
+            return {
+                "student_id": student_id,
+                "liveness": "FAILED",
+                "face": "NOT_CHECKED",
+                "similarity": None,
+                "threshold": self.face_service.threshold,
+                "attendance": "REJECTED"
+            }
+
+        # -----------------------------------------------------
+        # FACE RECOGNITION
+        #
+        # IMPORTANT:
+        # InsightFace is called ONLY ONCE here,
+        # after liveness has already been verified.
+        # -----------------------------------------------------
+
+        try:
+
+            face_result = (
+                self.verify_face_from_frame(
+                    frame,
+                    student_id
+                )
+            )
+
+        except ValueError as error:
+
+            return {
+                "student_id": student_id,
+                "liveness": "VERIFIED",
+                "face": "ERROR",
+                "similarity": None,
+                "threshold": self.face_service.threshold,
+                "attendance": "REJECTED",
+                "error": str(error)
+            }
+
+        # -----------------------------------------------------
+        # FINAL DECISION
+        # -----------------------------------------------------
+
+        return self.create_attendance_result(
+            student_id,
+            liveness_verified,
+            face_result
+        )
