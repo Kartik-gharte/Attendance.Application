@@ -28,12 +28,36 @@ class AttendanceVerificationService:
         print("        FACE VERIFICATION")
         print("======================================")
 
-        result = self.face_service.recognize(
-            image_path,
-            student_id
-        )
+        try:
 
-        return result
+            result = self.face_service.recognize(
+                image_path,
+                student_id
+            )
+
+            return result
+
+        except ValueError as error:
+
+            print("Face verification ValueError:", error)
+
+            return {
+                "result": "NO_FACE",
+                "similarity": None,
+                "threshold": self.face_service.threshold,
+                "error": str(error)
+            }
+
+        except Exception as error:
+
+            print("Face verification error:", error)
+
+            return {
+                "result": "ERROR",
+                "similarity": None,
+                "threshold": self.face_service.threshold,
+                "error": str(error)
+            }
 
     # =========================================================
     # VERIFY FACE FROM CAMERA FRAME
@@ -50,12 +74,36 @@ class AttendanceVerificationService:
         print("    LIVE FACE VERIFICATION")
         print("======================================")
 
-        result = self.face_service.recognize_frame(
-            frame,
-            student_id
-        )
+        try:
 
-        return result
+            result = self.face_service.recognize_frame(
+                frame,
+                student_id
+            )
+
+            return result
+
+        except ValueError as error:
+
+            print("Face verification ValueError:", error)
+
+            return {
+                "result": "NO_FACE",
+                "similarity": None,
+                "threshold": self.face_service.threshold,
+                "error": str(error)
+            }
+
+        except Exception as error:
+
+            print("Face verification error:", error)
+
+            return {
+                "result": "ERROR",
+                "similarity": None,
+                "threshold": self.face_service.threshold,
+                "error": str(error)
+            }
 
     # =========================================================
     # CREATE FINAL ATTENDANCE RESULT
@@ -68,6 +116,9 @@ class AttendanceVerificationService:
         face_result
     ):
 
+        if face_result is None:
+            face_result = {}
+
         face_matched = (
             face_result.get("result") == "MATCH"
         )
@@ -76,6 +127,31 @@ class AttendanceVerificationService:
             liveness_verified
             and face_matched
         )
+
+        face_result_type = face_result.get(
+            "result",
+            "UNKNOWN"
+        )
+
+        # -----------------------------------------------------
+        # FACE STATUS
+        # -----------------------------------------------------
+
+        if face_result_type == "MATCH":
+
+            face_status = "MATCH"
+
+        elif face_result_type == "NO_FACE":
+
+            face_status = "NO_FACE"
+
+        elif face_result_type == "ERROR":
+
+            face_status = "ERROR"
+
+        else:
+
+            face_status = "UNKNOWN"
 
         return {
             "student_id": student_id,
@@ -86,11 +162,7 @@ class AttendanceVerificationService:
                 else "FAILED"
             ),
 
-            "face": (
-                "MATCH"
-                if face_matched
-                else "UNKNOWN"
-            ),
+            "face": face_status,
 
             "similarity": face_result.get(
                 "similarity"
@@ -104,6 +176,10 @@ class AttendanceVerificationService:
                 "VERIFIED"
                 if attendance_verified
                 else "REJECTED"
+            ),
+
+            "error": face_result.get(
+                "error"
             )
         }
 
@@ -130,44 +206,27 @@ class AttendanceVerificationService:
                 "face": "NOT_CHECKED",
                 "similarity": None,
                 "threshold": self.face_service.threshold,
-                "attendance": "REJECTED"
+                "attendance": "REJECTED",
+                "error": "Liveness verification required"
             }
 
         # -----------------------------------------------------
         # FACE RECOGNITION
-        #
-        # IMPORTANT:
-        # InsightFace is called ONLY ONCE here,
-        # after liveness has already been verified.
         # -----------------------------------------------------
 
-        try:
-
-            face_result = (
-                self.verify_face_from_frame(
-                    frame,
-                    student_id
-                )
-            )
-
-        except ValueError as error:
-
-            return {
-                "student_id": student_id,
-                "liveness": "VERIFIED",
-                "face": "ERROR",
-                "similarity": None,
-                "threshold": self.face_service.threshold,
-                "attendance": "REJECTED",
-                "error": str(error)
-            }
+        face_result = self.verify_face_from_frame(
+            frame,
+            student_id
+        )
 
         # -----------------------------------------------------
         # FINAL DECISION
         # -----------------------------------------------------
 
-        return self.create_attendance_result(
+        result = self.create_attendance_result(
             student_id,
             liveness_verified,
             face_result
         )
+
+        return result
