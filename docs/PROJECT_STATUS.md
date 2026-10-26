@@ -6,10 +6,11 @@
 
 | Item | State |
 | --- | --- |
-| Foundation branch | `chore/project-foundation` (prepared from `main` at `79373d6`) |
+| Foundation PR | #1 merged into `main` at `885cf7b` |
 | Remote branches | `main` only after cleanup; temporary PR branches are deleted after merge |
 | Local backups | `refs/backup/feature-ai-attendance-security`, `refs/backup/feature-attendance-verification-stable`, `refs/backup/main-before-attendance-merge-2026-10-26`, `refs/backup/main-initial` |
-| Foundation changes | Drafted; documentation checks passed; merge state is in Git history |
+| Foundation changes | Merged; documentation checks passed |
+| Open stabilization backlog | [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13) |
 | CI | No workflow exists in the repository; branch protection has not been verified |
 | Test suite | Manual scripts only; no pytest suite |
 

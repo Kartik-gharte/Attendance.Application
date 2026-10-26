@@ -6,7 +6,7 @@ Build a trustworthy attendance-verification backend in small, reviewable increme
 
 This roadmap is a proposal. It does not promise dates and does not mean any listed item is implemented.
 
-## Phase 0 — Project foundation (in progress)
+## Phase 0 — Project foundation (merge complete; CI expectations pending)
 
 **Goal:** make the repository understandable and governable before changing runtime behavior.
 
@@ -15,7 +15,7 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 - [x] Add root project and agent documentation.
 - [x] Add documentation set and index.
 - [x] Add issue and pull-request templates.
-- [ ] Review and merge the foundation branch through a pull request.
+- [x] Review and merge the foundation branch through pull request #1.
 - [ ] Confirm CI/branch-protection expectations.
 
 **Exit criteria:** documentation matches the code, links and claims are reviewed, and the changes are merged without altering runtime behavior.
