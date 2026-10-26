@@ -11,8 +11,8 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 IMAGE_PATH = (
     BASE_DIR
-    / "app"
-    / "services"
+    / "tests"
+    / "fixtures"
     / "test.jpg"
 )
 
@@ -38,12 +38,22 @@ print(MODEL_PATH)
 
 print()
 
+
 if not IMAGE_PATH.exists():
-    print("ERROR: Test image does not exist")
+
+    print(
+        "ERROR: Test image does not exist"
+    )
+
     exit()
 
+
 if not MODEL_PATH.exists():
-    print("ERROR: MediaPipe model does not exist")
+
+    print(
+        "ERROR: MediaPipe model does not exist"
+    )
+
     exit()
 
 
@@ -51,36 +61,60 @@ if not MODEL_PATH.exists():
 # LOAD IMAGE
 # =========================================================
 
-image = cv2.imread(str(IMAGE_PATH))
+image = cv2.imread(
+    str(IMAGE_PATH)
+)
+
 
 if image is None:
-    print("ERROR: Image could not be opened")
+
+    print(
+        "ERROR: Image could not be opened"
+    )
+
     exit()
 
-print("Image opened successfully")
+
+print(
+    "Image opened successfully"
+)
 
 
 # =========================================================
 # MEDIAPIPE FACE DETECTOR
 # =========================================================
 
-BaseOptions = mp.tasks.BaseOptions
+BaseOptions = (
+    mp.tasks.BaseOptions
+)
 
-FaceDetector = mp.tasks.vision.FaceDetector
+FaceDetector = (
+    mp.tasks.vision.FaceDetector
+)
 
 FaceDetectorOptions = (
     mp.tasks.vision.FaceDetectorOptions
 )
 
-VisionRunningMode = mp.tasks.vision.RunningMode
+VisionRunningMode = (
+    mp.tasks.vision.RunningMode
+)
 
 
 options = FaceDetectorOptions(
+
     base_options=BaseOptions(
-        model_asset_path=str(MODEL_PATH)
+        model_asset_path=str(
+            MODEL_PATH
+        )
     ),
-    running_mode=VisionRunningMode.IMAGE,
+
+    running_mode=(
+        VisionRunningMode.IMAGE
+    ),
+
     min_detection_confidence=0.5
+
 )
 
 
@@ -93,8 +127,11 @@ rgb_image = cv2.cvtColor(
     cv2.COLOR_BGR2RGB
 )
 
+
 mp_image = mp.Image(
-    image_format=mp.ImageFormat.SRGB,
+    image_format=(
+        mp.ImageFormat.SRGB
+    ),
     data=rgb_image
 )
 
@@ -107,7 +144,9 @@ with FaceDetector.create_from_options(
     options
 ) as detector:
 
-    result = detector.detect(mp_image)
+    result = detector.detect(
+        mp_image
+    )
 
 
 # =========================================================
@@ -117,14 +156,23 @@ with FaceDetector.create_from_options(
 if result.detections:
 
     print()
-    print("======================================")
-    print("FACE DETECTION SUCCESS")
-    print("======================================")
+    print(
+        "======================================"
+    )
+
+    print(
+        "FACE DETECTION SUCCESS"
+    )
+
+    print(
+        "======================================"
+    )
 
     print(
         "Number of faces:",
         len(result.detections)
     )
+
 
     for i, detection in enumerate(
         result.detections
@@ -139,9 +187,18 @@ if result.detections:
             confidence
         )
 
+
 else:
 
     print()
-    print("======================================")
-    print("NO FACE DETECTED")
-    print("======================================")
+    print(
+        "======================================"
+    )
+
+    print(
+        "NO FACE DETECTED"
+    )
+
+    print(
+        "======================================"
+    )
