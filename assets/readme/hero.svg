@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="heroTitle heroDesc" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="heroTitle">Attendance.Application — camera-based attendance verification</title>
+  <desc id="heroDesc">A conceptual verification viewport showing a face landmark mesh, a live liveness session, a 0.653 face match, and a present attendance result. The project combines blink-based liveness, heuristic frame screening, InsightFace matching, and SQLite attendance records.</desc>
+
+  <defs>
+    <radialGradient id="heroGlow" cx="0.78" cy="0.46" r="0.62">
+      <stop offset="0" stop-color="#123B44" stop-opacity="0.9"/>
+      <stop offset="0.56" stop-color="#0A1C26" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#07131C" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="scanFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5FE3C0" stop-opacity="0"/>
+      <stop offset="0.18" stop-color="#5FE3C0" stop-opacity="0.65"/>
+      <stop offset="0.82" stop-color="#5FE3C0" stop-opacity="0.65"/>
+      <stop offset="1" stop-color="#5FE3C0" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="420" fill="#07131C"/>
+  <rect width="1200" height="420" fill="url(#heroGlow)"/>
+
+  <g fill="none" stroke="#12303A" stroke-width="1">
+    <circle cx="962" cy="210" r="236"/>
+    <circle cx="962" cy="210" r="196"/>
+  </g>
+
+  <g>
+    <circle cx="66" cy="75" r="4" fill="#5FE3C0"/>
+    <text x="82" y="81" fill="#86A5B4" font-size="17" font-weight="600" letter-spacing="2.1">AI-ASSISTED ATTENDANCE VERIFICATION</text>
+  </g>
+
+  <text x="64" y="166" fill="#EFF8FA" font-size="66" font-weight="700" letter-spacing="-2.4">Attendance</text>
+  <text x="64" y="236" font-size="66" font-weight="700" letter-spacing="-2.4"><tspan fill="#5FE3C0">.</tspan><tspan fill="#EFF8FA">Application</tspan></text>
+
+  <text x="64" y="296" fill="#A8BECB" font-size="24">One camera pass. Liveness, face match,</text>
+  <text x="64" y="326" fill="#A8BECB" font-size="24">and a duplicate-safe attendance record.</text>
+
+  <g font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="15" letter-spacing="1.1">
+    <g>
+      <rect x="64" y="360" width="80" height="30" rx="15" fill="#0B202B" stroke="#244452"/>
+      <text x="104" y="380" fill="#8FA9B7" text-anchor="middle">PYTHON</text>
+    </g>
+    <g>
+      <rect x="152" y="360" width="88" height="30" rx="15" fill="#0B202B" stroke="#244452"/>
+      <text x="196" y="380" fill="#8FA9B7" text-anchor="middle">FASTAPI</text>
+    </g>
+    <g>
+      <rect x="248" y="360" width="108" height="30" rx="15" fill="#0B202B" stroke="#244452"/>
+      <text x="302" y="380" fill="#8FA9B7" text-anchor="middle">MEDIAPIPE</text>
+    </g>
+    <g>
+      <rect x="364" y="360" width="128" height="30" rx="15" fill="#0B202B" stroke="#244452"/>
+      <text x="428" y="380" fill="#8FA9B7" text-anchor="middle">INSIGHTFACE</text>
+    </g>
+    <g>
+      <rect x="500" y="360" width="82" height="30" rx="15" fill="#0B202B" stroke="#244452"/>
+      <text x="541" y="380" fill="#8FA9B7" text-anchor="middle">SQLITE</text>
+    </g>
+  </g>
+
+  <g>
+    <rect x="788" y="54" width="348" height="312" rx="24" fill="#091923" stroke="#1D3D4A" stroke-width="1.5"/>
+
+    <g fill="none" stroke="#5FE3C0" stroke-width="2" stroke-linecap="round" opacity="0.8">
+      <path d="M806 90V78a10 10 0 0 1 10-10h12"/>
+      <path d="M1114 68h12a10 10 0 0 1 10 10v12"/>
+      <path d="M806 330v12a10 10 0 0 0 10 10h12"/>
+      <path d="M1114 352h12a10 10 0 0 0 10-10v-12"/>
+    </g>
+
+    <text x="812" y="88" fill="#89A6B3" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="14" letter-spacing="1.4">VERIFICATION VIEW</text>
+    <text x="1112" y="88" fill="#FFB86B" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" letter-spacing="1.4" text-anchor="end">CONCEPT</text>
+    <line x1="812" y1="106" x2="1112" y2="106" stroke="#1C3A46"/>
+
+    <g>
+      <rect x="812" y="120" width="72" height="24" rx="12" fill="#0B2C2A" stroke="#1F5D53"/>
+      <circle cx="826" cy="132" r="3.5" fill="#5FE3C0"/>
+      <text x="838" y="137" fill="#8BE9D2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="13" letter-spacing="1.2">LIVE</text>
+    </g>
+
+    <path d="M962 112 C918 112 892 154 892 208 C892 268 922 318 962 318 C1002 318 1032 268 1032 208 C1032 154 1006 112 962 112 Z" fill="#0A1E27" stroke="#3C6372" stroke-width="1.8"/>
+
+    <g fill="none" stroke="#2B5361" stroke-width="1" opacity="0.9">
+      <path d="M906 190 L908 230 L916 266 L934 294 L962 304 L990 294 L1008 266 L1016 230 L1018 190"/>
+      <path d="M920 166 L936 160 L952 164"/>
+      <path d="M972 164 L988 160 L1004 166"/>
+      <path d="M962 190 L950 230 L962 240 L974 230"/>
+      <path d="M936 264 L950 258 L962 262 L974 258 L988 264"/>
+      <path d="M946 270 L962 274 L978 270"/>
+      <path d="M906 190 L920 214 L936 264"/>
+      <path d="M1018 190 L1004 214 L988 264"/>
+      <path d="M920 214 L948 220 L962 230 L976 220 L1004 214"/>
+      <path d="M948 220 L936 264"/>
+      <path d="M976 220 L988 264"/>
+      <path d="M936 184 L950 230"/>
+      <path d="M988 184 L974 230"/>
+    </g>
+
+    <g fill="none" stroke="#7FA9B7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M924 184 L936 178 L948 184"/>
+      <path d="M976 184 L988 178 L1000 184"/>
+    </g>
+    <ellipse cx="988" cy="183" rx="22" ry="12" fill="none" stroke="#5FE3C0" stroke-width="1.4" stroke-dasharray="3 4" opacity="0.55"/>
+
+    <g fill="#5FE3C0">
+      <circle cx="924" cy="184" r="2.7"/>
+      <circle cx="936" cy="178" r="2.7"/>
+      <circle cx="948" cy="184" r="2.7"/>
+      <circle cx="976" cy="184" r="2.7"/>
+      <circle cx="988" cy="178" r="2.7"/>
+      <circle cx="1000" cy="184" r="2.7"/>
+      <circle cx="920" cy="166" r="2.3"/>
+      <circle cx="936" cy="160" r="2.3"/>
+      <circle cx="952" cy="164" r="2.3"/>
+      <circle cx="972" cy="164" r="2.3"/>
+      <circle cx="988" cy="160" r="2.3"/>
+      <circle cx="1004" cy="166" r="2.3"/>
+      <circle cx="950" cy="230" r="2.7"/>
+      <circle cx="962" cy="240" r="2.7"/>
+      <circle cx="974" cy="230" r="2.7"/>
+      <circle cx="936" cy="264" r="2.5"/>
+      <circle cx="950" cy="258" r="2.5"/>
+      <circle cx="962" cy="262" r="2.5"/>
+      <circle cx="974" cy="258" r="2.5"/>
+      <circle cx="988" cy="264" r="2.5"/>
+      <circle cx="906" cy="190" r="2.3"/>
+      <circle cx="908" cy="230" r="2.3"/>
+      <circle cx="916" cy="266" r="2.3"/>
+      <circle cx="934" cy="294" r="2.3"/>
+      <circle cx="962" cy="304" r="2.3"/>
+      <circle cx="990" cy="294" r="2.3"/>
+      <circle cx="1008" cy="266" r="2.3"/>
+      <circle cx="1016" cy="230" r="2.3"/>
+      <circle cx="1018" cy="190" r="2.3"/>
+    </g>
+
+    <line x1="874" y1="212" x2="1050" y2="212" stroke="url(#scanFade)" stroke-width="1.5"/>
+
+    <rect x="812" y="326" width="224" height="26" rx="13" fill="#0C2A2E" stroke="#1A5A50"/>
+    <text x="826" y="344" fill="#9FE8D2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="15">✓ BLINK  ·  MATCH 0.653</text>
+  </g>
+
+  <g transform="translate(1044 250)">
+    <rect width="124" height="64" rx="14" fill="#0C2B2A" stroke="#2B7C69"/>
+    <circle cx="20" cy="24" r="8" fill="#5FE3C0" opacity="0.16"/>
+    <path d="M16 24l3 3 5-6" fill="none" stroke="#5FE3C0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="36" y="29" fill="#8BE9D2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="15" letter-spacing="0.8">PRESENT</text>
+    <text x="16" y="50" fill="#7F9C9B" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="11" letter-spacing="1.2">RECORDED</text>
+  </g>
+</svg>
