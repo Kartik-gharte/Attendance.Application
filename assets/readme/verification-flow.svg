@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="flowTitle flowDesc" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="flowTitle">Attendance verification pipeline</title>
+  <desc id="flowDesc">Four stages: start a 30-second in-memory liveness session, detect a blink and screen frame quality, match an InsightFace embedding at cosine similarity 0.40, and write a duplicate-protected SQLite attendance record. Liveness screening is heuristic, not certified presentation-attack detection.</desc>
+
+  <rect width="1200" height="300" fill="#F1F6F4"/>
+
+  <rect x="64" y="28" width="6" height="22" rx="3" fill="#0F8A72"/>
+  <text x="80" y="46" fill="#2A6B5C" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="15" font-weight="600" letter-spacing="2">VERIFICATION PIPELINE</text>
+  <text x="1136" y="46" fill="#668078" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="14" letter-spacing="1.2" text-anchor="end">FOUR CHECKS / ONE RECORD</text>
+
+  <g stroke="#C9DDD6" stroke-width="1">
+    <line x1="320" y1="68" x2="320" y2="246"/>
+    <line x1="600" y1="68" x2="600" y2="246"/>
+    <line x1="880" y1="68" x2="880" y2="246"/>
+  </g>
+
+  <line x1="64" y1="114" x2="1136" y2="114" stroke="#B7D2C8" stroke-width="1.5"/>
+
+  <g fill="#F1F6F4" stroke="#0F8A72" stroke-width="2.5">
+    <circle cx="64" cy="114" r="8"/>
+    <circle cx="344" cy="114" r="8"/>
+    <circle cx="624" cy="114" r="8"/>
+    <circle cx="904" cy="114" r="8"/>
+  </g>
+  <g fill="#0F8A72">
+    <circle cx="64" cy="114" r="2.5"/>
+    <circle cx="344" cy="114" r="2.5"/>
+    <circle cx="624" cy="114" r="2.5"/>
+    <circle cx="904" cy="114" r="2.5"/>
+  </g>
+
+  <g fill="none" stroke="#8FB7A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M326 108l6 6-6 6"/>
+    <path d="M606 108l6 6-6 6"/>
+    <path d="M886 108l6 6-6 6"/>
+  </g>
+
+  <g font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="15" font-weight="600" letter-spacing="1.6" fill="#2A6B5C">
+    <text x="64" y="82">01 / SESSION</text>
+    <text x="344" y="82">02 / LIVENESS</text>
+    <text x="624" y="82">03 / IDENTITY</text>
+    <text x="904" y="82">04 / RECORD</text>
+  </g>
+
+  <g fill="#0B1E26" font-size="26" font-weight="700">
+    <text x="64" y="162">Start a session</text>
+    <text x="344" y="162">Prove liveness</text>
+    <text x="624" y="162">Match the face</text>
+    <text x="904" y="162">Write the record</text>
+  </g>
+
+  <g fill="#536A63" font-size="18">
+    <text x="64" y="190">In-memory session;</text>
+    <text x="64" y="214">30-second window</text>
+    <text x="64" y="238">after verification.</text>
+
+    <text x="344" y="190">Blink detection plus</text>
+    <text x="344" y="214">basic image-quality</text>
+    <text x="344" y="238">screening.</text>
+
+    <text x="624" y="190">InsightFace embedding;</text>
+    <text x="624" y="214">cosine match at 0.40.</text>
+
+    <text x="904" y="190">SQLite insert with a</text>
+    <text x="904" y="214">uniqueness constraint.</text>
+  </g>
+
+  <circle cx="68" cy="266" r="4" fill="#C47A23"/>
+  <text x="82" y="272" fill="#7B4B12" font-size="17">Blink and image-quality checks are heuristic screening — not certified presentation-attack detection.</text>
+</svg>

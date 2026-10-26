@@ -1,190 +1,133 @@
-# Attendance.Application
+<p align="center">
+  <img src="assets/readme/hero.svg" width="100%" alt="Attendance.Application: one camera pass for liveness, face matching, and a duplicate-safe attendance record.">
+</p>
 
-Attendance.Application is an AI-assisted student attendance verification backend. It combines face recognition, blink-based liveness detection, basic image-quality screening, and SQLite attendance records to verify a student before marking attendance.
+<p align="center">
+  <a href="#what-it-does">What it does</a> ·
+  <a href="#how-verification-works">How it works</a> ·
+  <a href="#api-surface">API</a> ·
+  <a href="#status">Status</a> ·
+  <a href="#setup-status">Setup</a> ·
+  <a href="#documentation">Docs</a>
+</p>
 
-> **Project status:** the feature code is present on `main`, but runtime setup is not yet reproducible. The dependency manifest and configuration module are empty, the MediaPipe model path is Windows-specific, and database initialization is not wired into application startup. Treat the project as under active development and not production-ready.
+> [!WARNING]
+> **Active development — not production-ready.** The feature code is present, but a fresh clone is not yet runnable: the dependency manifest and configuration are empty, the MediaPipe model path is machine-specific, and database initialization is not wired into startup. Runtime behavior is unverified. Track stabilization in [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
-## Overview
+## What it does
 
-Traditional attendance is slow and easy to proxy. This project explores a camera-based flow:
+Attendance.Application is a camera-based attendance verification backend built with FastAPI. It combines blink-based liveness, heuristic frame screening, InsightFace matching, and SQLite persistence.
 
-1. A liveness session is created.
-2. Webcam frames are checked for a face and a blink.
-3. Basic image-quality screening runs alongside liveness detection.
-4. A final image is compared with a previously registered face embedding.
-5. Verified attendance is stored in SQLite, with duplicate protection per student, lecture, and date.
+The intended flow is narrow: establish presence, match identity, and write one attendance record. There is no web UI; the current client is a manual Python/OpenCV script.
 
-The current client is a manual Python/OpenCV script. There is no web frontend yet.
+- **Presence** — a face must produce a blink while basic image-quality screening passes. Both checks are heuristic, not certified presentation-attack detection.
+- **Identity** — an InsightFace `buffalo_l` embedding is compared with the registered student embedding using cosine similarity at a `0.40` threshold.
+- **Record** — a match is inserted into SQLite with a `UNIQUE (student_id, lecture_id, attendance_date)` constraint. Attendance can be queried by student or across all records.
 
-## Implemented capabilities
+## How verification works
 
-The following capabilities exist in the source code. Their runtime status is tracked in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
+<p align="center">
+  <img src="assets/readme/verification-flow.svg" width="100%" alt="Verification pipeline: start an in-memory liveness session, detect a blink and screen frame quality, match an InsightFace embedding at 0.40, then write a duplicate-protected SQLite record.">
+</p>
 
-- UUID-based, in-memory liveness sessions.
-- MediaPipe Face Landmarker integration for face landmarks.
-- Eye Aspect Ratio (EAR) calculation and blink detection.
-- Heuristic image-quality screening (face size, brightness, sharpness).
-- InsightFace (`buffalo_l`) face embeddings.
-- Cosine-similarity face matching with a `0.40` threshold.
-- Combined liveness + face-match attendance decision.
-- SQLite attendance persistence with a uniqueness constraint.
-- Attendance retrieval by student and for all records.
-- Manual scripts for face registration, recognition, liveness, and API testing.
+1. **Start a session** — `POST /liveness/start` creates an in-memory UUID session.
+2. **Prove liveness** — `POST /liveness/frame` checks for a face, a blink, and basic frame quality. A blink plus the screening must pass for liveness to be verified.
+3. **Match identity** — `POST /attendance/verify` requires a liveness-verified session no older than 30 seconds, extracts an InsightFace embedding, and compares it with the registered student embedding.
+4. **Write one record** — a match inserts into SQLite; a duplicate is rejected by the unique constraint. Success and face rejection both consume the session.
 
-## Technology stack
+Liveness sessions are process-local: they disappear on restart and are not shared between workers. The full response and failure behavior is documented in [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
 
-| Area | Technology |
+## API surface
+
+| Method | Endpoint | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/` | Static service message; not a model/database readiness check | None |
+| `POST` | `/liveness/start` | Create an in-memory liveness session | None |
+| `POST` | `/liveness/frame` | Submit a webcam frame for liveness processing | None |
+| `POST` | `/attendance/verify` | Verify liveness + face and attempt to mark attendance | None |
+| `GET` | `/attendance/student/{student_id}` | List a student's attendance records | None |
+| `GET` | `/attendance/all` | List all attendance records | None |
+
+There is no authentication today. Application-level errors usually return HTTP `200` with `status: "error"`; missing form fields return HTTP `422`. Interactive OpenAPI docs are available at `/docs` and `/redoc` only after startup succeeds.
+
+## Stack
+
+| Layer | Tools |
 | --- | --- |
-| Language | Python |
 | API | FastAPI, Uvicorn, `python-multipart` |
-| Computer vision | OpenCV, MediaPipe, InsightFace, ONNX Runtime |
+| Vision | OpenCV, MediaPipe, InsightFace, ONNX Runtime |
 | Numerics | NumPy |
 | Persistence | SQLite (Python standard library) |
-| Manual client/tests | OpenCV webcam capture, `requests` |
+| Manual client | OpenCV webcam capture, `requests` |
 
-Dependency versions are not currently declared. See [docs/SETUP.md](docs/SETUP.md) and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
+Dependency versions are not declared yet; runtime bootstrap is tracked in [#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2).
 
-## Verification flow
+## Status
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API
-    participant Liveness
-    participant Face
-    participant DB
+The source contains these pieces, but end-to-end runtime behavior is unverified.
 
-    Client->>API: POST /liveness/start
-    API-->>Client: session_id
-    loop Webcam frames
-        Client->>API: POST /liveness/frame
-        API->>Liveness: process_frame()
-        Liveness-->>API: face, EAR, blink, screening
-        API-->>Client: liveness status
-    end
-    Client->>API: POST /attendance/verify
-    API->>API: validate liveness session and expiry
-    API->>Face: extract and compare embeddings
-    Face-->>API: MATCH / UNKNOWN / error
-    alt verified
-        API->>DB: INSERT attendance
-        DB-->>API: record or duplicate
-        API-->>Client: success / duplicate
-    else rejected
-        API-->>Client: rejected
-    end
-```
+| Present in source | Not yet verified or missing |
+| --- | --- |
+| Blink-based liveness, EAR state machine, heuristic frame screening | Fresh-clone startup ([#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2)) |
+| InsightFace embeddings and `0.40` cosine matching | Runtime behavior of every endpoint |
+| SQLite schema, inserts, duplicate constraint, queries | Database initialization at startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)) |
+| Manual registration, camera, and API scripts | Auth ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)), retention/deletion ([#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9)), automated tests/CI ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)) |
 
-## Architecture at a glance
+No benchmarked face-recognition accuracy, liveness performance, or presentation-attack resistance results exist. Stabilization work is sequenced in the [tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
-- `app/main.py` — FastAPI application, CORS, router registration.
-- `app/api/liveness_routes.py` — liveness session and frame endpoints.
-- `app/api/routes.py` — attendance verification and retrieval endpoints.
-- `app/services/liveness.py` — MediaPipe landmarks, EAR, blink state.
-- `app/services/anti_spoofing.py` — heuristic frame screening.
-- `app/services/face_recognition.py` — InsightFace embeddings and similarity.
-- `app/services/attendance_verification.py` — combines liveness and face results.
-- `app/database/attendance_db.py` — SQLite connection, schema, inserts, queries.
-- `app/services/register_face.py`, `recognize_face.py`, `combined_test.py` — manual scripts, not API endpoints.
+## Setup status
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for component responsibilities and data flow.
+**There is no verified install or startup command yet.** A fresh clone is blocked by:
 
-## Repository structure
+- Empty `requirements.txt` and `app/core/config.py`.
+- A hardcoded Windows MediaPipe model path in `app/services/liveness.py`.
+- `initialize_database()` not being called during application startup.
+- Model assets and registered embeddings that are not included in the repository.
+
+Start with [docs/SETUP.md](docs/SETUP.md), then the [stabilization backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13). The first runtime blockers are [#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2) and [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3). Manual script requirements are in [docs/TESTING.md](docs/TESTING.md).
+
+## Repository map
 
 ```text
 Attendance.Application/
 ├── app/
-│   ├── api/              # FastAPI routes
-│   ├── core/             # configuration module (currently empty)
-│   ├── database/         # SQLite access and schema
-│   ├── services/         # liveness, anti-spoofing, face recognition
-│   └── main.py           # application entry point
-├── tests/services/       # manual camera/model scripts (not pytest tests)
-├── docs/                 # project documentation
+│   ├── api/              # liveness and attendance routes
+│   ├── database/         # SQLite schema and queries
+│   ├── services/         # liveness, screening, matching, manual scripts
+│   └── main.py           # FastAPI entry point
+├── assets/readme/        # README visuals (static SVG)
+├── docs/                 # setup, architecture, API, security, status
+├── tests/services/       # manual camera/model scripts
 ├── test_api_attendance.py
 ├── test_liveness_service.py
 ├── requirements.txt      # currently empty
 └── README.md
 ```
 
-## Prerequisites
+## Security & privacy
 
-- The supported Python version has not been verified. The AI stack may require Python 3.10 or newer; confirm compatibility during Phase 1 runtime stabilization.
-- A webcam for manual end-to-end testing.
-- The MediaPipe Face Landmarker model file (`face_landmarker.task`). The current code expects a hardcoded Windows path; see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-- InsightFace `buffalo_l` model assets, loaded by name by the code.
-- A registered face embedding for each student under `data/face_embeddings/<student_id>.npy`.
-- SQLite is included with Python; no separate server is required.
+> [!CAUTION]
+> This is biometric software under active development. Do not use real student faces, embeddings, or attendance records in development or public repositories.
 
-## Setup and startup
+- The API has no authentication or authorization. Liveness session IDs behave like short-lived bearer tokens and should not be logged.
+- Anti-spoofing is heuristic blink and image-quality screening, not a trained or certified presentation-attack detection system.
+- Liveness sessions live in process memory, are single-worker only, and expire 30 seconds after successful liveness verification.
+- There is no biometric retention, deletion, or storage-protection policy yet; this is tracked in [#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9).
+- Face images, embeddings, model files, and local databases are excluded from Git. Never force-add them.
 
-Setup is **not yet reproducible**. The repository does not declare its dependencies, and the current model path and database initialization prevent a clean fresh-clone startup.
-
-Do not treat an install command as verified until [docs/SETUP.md](docs/SETUP.md) is updated with a tested workflow. That document lists the blockers, expected assets, and the intended commands.
-
-## API documentation
-
-The endpoint reference is [docs/API_REFERENCE.md](docs/API_REFERENCE.md). When the application starts successfully, FastAPI also exposes interactive documentation at `/docs` and `/redoc`.
-
-Current endpoints:
-
-```text
-GET  /
-POST /liveness/start
-POST /liveness/frame
-POST /attendance/verify
-GET  /attendance/student/{student_id}
-GET  /attendance/all
-```
-
-## Testing
-
-There is no automated pytest suite. The files named `test_*.py` are manual scripts that execute at import time and require a camera, model files, fixtures, and/or a running server.
-
-See [docs/TESTING.md](docs/TESTING.md) for the current scripts, hardware requirements, known gaps, and the checks that can be run without model assets.
-
-## Security and privacy
-
-- Face embeddings, source images, local databases, and models are excluded from Git by `.gitignore`.
-- The API currently has no authentication or authorization.
-- Liveness sessions are stored in process memory and expire 30 seconds after verification.
-- Anti-spoofing is heuristic image screening combined with a blink check. It is **not** a trained or certified presentation-attack detection system.
-- Do not use real student biometric data in development or public repositories.
-
-Read [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) before working with biometric data.
-
-## Current limitations
-
-- No web client or user interface.
-- No authentication, authorization, or role model.
-- No automated test suite, CI workflow, or reproducible test fixtures.
-- No database migration system.
-- No verified fresh-clone startup.
-- No benchmarked face-recognition accuracy or liveness performance.
-- Anti-spoofing is basic screening, not a trained PAD model.
-
-## Contributing
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md). Work should start from a GitHub issue and use a focused branch. Do not commit credentials, biometric data, model files, or local databases.
+Read [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) before handling biometric data.
 
 ## Documentation
 
-| Document | Purpose |
-| --- | --- |
-| [docs/README.md](docs/README.md) | Documentation index |
-| [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) | Scope and requirements with status |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components and data flow |
-| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | Endpoint behavior |
-| [docs/DATABASE.md](docs/DATABASE.md) | Schema and persistence |
-| [docs/SETUP.md](docs/SETUP.md) | Setup status and prerequisites |
-| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Hardcoded settings and proposed config |
-| [docs/TESTING.md](docs/TESTING.md) | Manual scripts and test gaps |
-| [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) | Risks and data handling |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Proposed phases and acceptance criteria |
-| [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Current verified state |
-| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | Confirmed outstanding issues |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Decision log |
-| [docs/plans/FOUNDATION_PLAN.md](docs/plans/FOUNDATION_PLAN.md) | This foundation task |
+**Start here:** [Setup](docs/SETUP.md) · [Architecture](docs/ARCHITECTURE.md) · [API reference](docs/API_REFERENCE.md) · [Security & privacy](docs/SECURITY_AND_PRIVACY.md)
+
+**Project state:** [Status](docs/PROJECT_STATUS.md) · [Known issues](docs/KNOWN_ISSUES.md) · [Roadmap](docs/ROADMAP.md) · [Full index](docs/README.md)
+
+**Reference:** [Database](docs/DATABASE.md) · [Configuration](docs/CONFIGURATION.md) · [Testing](docs/TESTING.md) · [Decisions](docs/DECISIONS.md)
+
+## Contributing
+
+Start from a GitHub issue and a focused branch. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md). Do not commit secrets, biometric data, model files, or local databases.
 
 ## Maintainer
 
@@ -192,4 +135,4 @@ Kartik Gharte — [Kartik-gharte](https://github.com/Kartik-gharte)
 
 ## License
 
-No license file is present in this repository. The project is currently presented as an academic and experimental project. Do not assume permission to reuse it beyond applicable law or the repository owner's instructions.
+No license file is present. The project is currently presented as an academic and experimental project. Do not assume permission to reuse it beyond applicable law or the repository owner's instructions.
