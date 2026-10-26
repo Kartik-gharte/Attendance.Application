@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
+*.pyo
 
 .env
 .env.*
@@ -16,9 +17,26 @@ models/
 *.jpg
 *.jpeg
 *.png
+*.onnx
+*.task
+*.tflite
+*.pt
+*.pth
 
 .vscode/
 .idea/
+.DS_Store
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+build/
+dist/
+*.egg-info/
 
 *.log
 

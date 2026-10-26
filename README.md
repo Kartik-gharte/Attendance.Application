@@ -1,260 +1,195 @@
-# 🎓 AI Attendance System
+# Attendance.Application
 
-An AI-powered attendance management system that combines **face recognition, liveness detection, anti-spoofing, and automated attendance verification** to provide a secure and reliable way of marking student attendance.
+Attendance.Application is an AI-assisted student attendance verification backend. It combines face recognition, blink-based liveness detection, basic image-quality screening, and SQLite attendance records to verify a student before marking attendance.
 
-> 🚧 This project is currently under active development.
+> **Project status:** the feature code is present on `main`, but runtime setup is not yet reproducible. The dependency manifest and configuration module are empty, the MediaPipe model path is Windows-specific, and database initialization is not wired into application startup. Treat the project as under active development and not production-ready.
 
----
+## Overview
 
-## 📌 Overview
+Traditional attendance is slow and easy to proxy. This project explores a camera-based flow:
 
-The AI Attendance System is designed to reduce manual attendance work while improving attendance security.
+1. A liveness session is created.
+2. Webcam frames are checked for a face and a blink.
+3. Basic image-quality screening runs alongside liveness detection.
+4. A final image is compared with a previously registered face embedding.
+5. Verified attendance is stored in SQLite, with duplicate protection per student, lecture, and date.
 
-Instead of traditional attendance methods, the system verifies a student's identity using their face and performs a liveness check before marking attendance.
+The current client is a manual Python/OpenCV script. There is no web frontend yet.
 
-### Current Verification Flow
+## Implemented capabilities
+
+The following capabilities exist in the source code. Their runtime status is tracked in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
+
+- UUID-based, in-memory liveness sessions.
+- MediaPipe Face Landmarker integration for face landmarks.
+- Eye Aspect Ratio (EAR) calculation and blink detection.
+- Heuristic image-quality screening (face size, brightness, sharpness).
+- InsightFace (`buffalo_l`) face embeddings.
+- Cosine-similarity face matching with a `0.40` threshold.
+- Combined liveness + face-match attendance decision.
+- SQLite attendance persistence with a uniqueness constraint.
+- Attendance retrieval by student and for all records.
+- Manual scripts for face registration, recognition, liveness, and API testing.
+
+## Technology stack
+
+| Area | Technology |
+| --- | --- |
+| Language | Python |
+| API | FastAPI, Uvicorn, `python-multipart` |
+| Computer vision | OpenCV, MediaPipe, InsightFace, ONNX Runtime |
+| Numerics | NumPy |
+| Persistence | SQLite (Python standard library) |
+| Manual client/tests | OpenCV webcam capture, `requests` |
+
+Dependency versions are not currently declared. See [docs/SETUP.md](docs/SETUP.md) and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
+
+## Verification flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Liveness
+    participant Face
+    participant DB
+
+    Client->>API: POST /liveness/start
+    API-->>Client: session_id
+    loop Webcam frames
+        Client->>API: POST /liveness/frame
+        API->>Liveness: process_frame()
+        Liveness-->>API: face, EAR, blink, screening
+        API-->>Client: liveness status
+    end
+    Client->>API: POST /attendance/verify
+    API->>API: validate liveness session and expiry
+    API->>Face: extract and compare embeddings
+    Face-->>API: MATCH / UNKNOWN / error
+    alt verified
+        API->>DB: INSERT attendance
+        DB-->>API: record or duplicate
+        API-->>Client: success / duplicate
+    else rejected
+        API-->>Client: rejected
+    end
+```
+
+## Architecture at a glance
+
+- `app/main.py` — FastAPI application, CORS, router registration.
+- `app/api/liveness_routes.py` — liveness session and frame endpoints.
+- `app/api/routes.py` — attendance verification and retrieval endpoints.
+- `app/services/liveness.py` — MediaPipe landmarks, EAR, blink state.
+- `app/services/anti_spoofing.py` — heuristic frame screening.
+- `app/services/face_recognition.py` — InsightFace embeddings and similarity.
+- `app/services/attendance_verification.py` — combines liveness and face results.
+- `app/database/attendance_db.py` — SQLite connection, schema, inserts, queries.
+- `app/services/register_face.py`, `recognize_face.py`, `combined_test.py` — manual scripts, not API endpoints.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for component responsibilities and data flow.
+
+## Repository structure
 
 ```text
-Student opens camera
-        ↓
-Liveness session starts
-        ↓
-Face detected
-        ↓
-Blink / liveness verification
-        ↓
-Anti-spoofing checks
-        ↓
-Face recognition
-        ↓
-Compare with registered face
-        ↓
-Identity verified
-        ↓
-Attendance marked
-✨ Current Features
-👤 Face Recognition
-Face registration
-Face embedding generation
-Registered student identification
-InsightFace-based face recognition
-Face similarity calculation
-Student ID-based verification
-🛡️ Liveness Detection
-Live camera verification
-Face landmark detection
-Blink-based liveness verification
-Session-based liveness flow
-Prevention of simple static-image attacks
-🔐 Anti-Spoofing
-Anti-spoofing service
-Integration with attendance verification pipeline
-Security checks before attendance approval
-📊 Attendance Verification
-
-The system combines multiple verification results:
-
-Liveness + Face Recognition + Anti-Spoofing
-                     ↓
-             Attendance Decision
-
-A successful verification returns:
-
-Liveness: VERIFIED
-Face: MATCH
-Attendance: VERIFIED
-🗄️ Attendance Database
-
-Currently uses SQLite for storing attendance records.
-
-Stored information includes:
-
-Student ID
-Subject
-Lecture ID
-Attendance date
-Attendance time
-Liveness status
-Face verification status
-Similarity score
-Attendance status
-Creation timestamp
-🏗️ Project Structure
-ai-service/
-│
+Attendance.Application/
 ├── app/
-│   │
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── liveness_routes.py
-│   │   └── routes.py
-│   │
-│   ├── core/
-│   │   ├── __init__.py
-│   │   └── config.py
-│   │
-│   ├── database/
-│   │   ├── __init__.py
-│   │   └── attendance_db.py
-│   │
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── anti_spoofing.py
-│   │   ├── attendance_verification.py
-│   │   ├── face_recognition.py
-│   │   ├── liveness.py
-│   │   ├── register_face.py
-│   │   └── recognize_face.py
-│   │
-│   ├── utils/
-│   │   └── __init__.py
-│   │
-│   └── main.py
-│
-├── tests/
-│
-├── requirements.txt
-├── .gitignore
+│   ├── api/              # FastAPI routes
+│   ├── core/             # configuration module (currently empty)
+│   ├── database/         # SQLite access and schema
+│   ├── services/         # liveness, anti-spoofing, face recognition
+│   └── main.py           # application entry point
+├── tests/services/       # manual camera/model scripts (not pytest tests)
+├── docs/                 # project documentation
+├── test_api_attendance.py
+├── test_liveness_service.py
+├── requirements.txt      # currently empty
 └── README.md
-🧠 Technology Stack
-Backend
-Python
-FastAPI
-Uvicorn
-AI / Computer Vision
-InsightFace
-MediaPipe
-ONNX Runtime
-OpenCV
-Database
-SQLite
-Development
-Git
-GitHub
-VS Code
-🔌 API Flow
-Liveness
+```
+
+## Prerequisites
+
+- The supported Python version has not been verified. The AI stack may require Python 3.10 or newer; confirm compatibility during Phase 1 runtime stabilization.
+- A webcam for manual end-to-end testing.
+- The MediaPipe Face Landmarker model file (`face_landmarker.task`). The current code expects a hardcoded Windows path; see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+- InsightFace `buffalo_l` model assets, loaded by name by the code.
+- A registered face embedding for each student under `data/face_embeddings/<student_id>.npy`.
+- SQLite is included with Python; no separate server is required.
+
+## Setup and startup
+
+Setup is **not yet reproducible**. The repository does not declare its dependencies, and the current model path and database initialization prevent a clean fresh-clone startup.
+
+Do not treat an install command as verified until [docs/SETUP.md](docs/SETUP.md) is updated with a tested workflow. That document lists the blockers, expected assets, and the intended commands.
+
+## API documentation
+
+The endpoint reference is [docs/API_REFERENCE.md](docs/API_REFERENCE.md). When the application starts successfully, FastAPI also exposes interactive documentation at `/docs` and `/redoc`.
+
+Current endpoints:
+
+```text
+GET  /
 POST /liveness/start
-
-Creates a liveness verification session.
-
 POST /liveness/frame
-
-Processes camera frames during the liveness session.
-
-Attendance
 POST /attendance/verify
+GET  /attendance/student/{student_id}
+GET  /attendance/all
+```
 
-Receives:
+## Testing
 
-Student ID
-Session ID
-Camera image
+There is no automated pytest suite. The files named `test_*.py` are manual scripts that execute at import time and require a camera, model files, fixtures, and/or a running server.
 
-and performs the final identity verification.
+See [docs/TESTING.md](docs/TESTING.md) for the current scripts, hardware requirements, known gaps, and the checks that can be run without model assets.
 
-📈 Verification Result
+## Security and privacy
 
-Example successful response:
+- Face embeddings, source images, local databases, and models are excluded from Git by `.gitignore`.
+- The API currently has no authentication or authorization.
+- Liveness sessions are stored in process memory and expire 30 seconds after verification.
+- Anti-spoofing is heuristic image screening combined with a blink check. It is **not** a trained or certified presentation-attack detection system.
+- Do not use real student biometric data in development or public repositories.
 
-{
-  "student_id": "STU001",
-  "liveness": "VERIFIED",
-  "face": "MATCH",
-  "similarity": 0.653,
-  "attendance": "VERIFIED"
-}
-🧪 Testing
+Read [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) before working with biometric data.
 
-The project contains multiple service-level tests for:
+## Current limitations
 
-Face recognition
-Face embeddings
-Face landmarks
-Liveness detection
-Attendance verification
-Anti-spoofing
+- No web client or user interface.
+- No authentication, authorization, or role model.
+- No automated test suite, CI workflow, or reproducible test fixtures.
+- No database migration system.
+- No verified fresh-clone startup.
+- No benchmarked face-recognition accuracy or liveness performance.
+- Anti-spoofing is basic screening, not a trained PAD model.
 
-Example:
+## Contributing
 
-python -m py_compile app\api\routes.py
-🔒 Security & Privacy
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md). Work should start from a GitHub issue and use a focused branch. Do not commit credentials, biometric data, model files, or local databases.
 
-Face embeddings, local databases, environment variables, images, and model files are intentionally excluded from Git using .gitignore.
+## Documentation
 
-The following types of files are not committed:
+| Document | Purpose |
+| --- | --- |
+| [docs/README.md](docs/README.md) | Documentation index |
+| [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) | Scope and requirements with status |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components and data flow |
+| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | Endpoint behavior |
+| [docs/DATABASE.md](docs/DATABASE.md) | Schema and persistence |
+| [docs/SETUP.md](docs/SETUP.md) | Setup status and prerequisites |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Hardcoded settings and proposed config |
+| [docs/TESTING.md](docs/TESTING.md) | Manual scripts and test gaps |
+| [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) | Risks and data handling |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Proposed phases and acceptance criteria |
+| [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Current verified state |
+| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | Confirmed outstanding issues |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Decision log |
+| [docs/plans/FOUNDATION_PLAN.md](docs/plans/FOUNDATION_PLAN.md) | This foundation task |
 
-.env
-.venv/
-data/
-models/
-*.npy
-*.db
-*.sqlite
-*.jpg
-*.jpeg
-*.png
-*.exe
+## Maintainer
 
-This prevents sensitive biometric data and local development files from being uploaded to the repository.
+Kartik Gharte — [Kartik-gharte](https://github.com/Kartik-gharte)
 
-🚧 Roadmap
-Phase 1 — Core Attendance
- Face registration
- Face recognition
- Liveness detection
- Blink verification
- Anti-spoofing service
- Attendance verification
- SQLite attendance storage
-Phase 2 — Advanced Security
- Unknown face detection
- Multiple face detection
- Improved anti-spoofing
- Attendance session security
- Audit logging
- Suspicious activity detection
-Phase 3 — Dashboard & Reports
- Admin dashboard
- Faculty dashboard
- Student dashboard
- Attendance analytics
- Attendance reports
- PDF export
- Excel export
-Phase 4 — Production System
- Production database
- Authentication and authorization
- API security
- Deployment
- Production monitoring
- College ERP integration
-🎯 Project Goal
+## License
 
-The long-term goal is to build a secure AI-based attendance platform capable of:
-
-Face Recognition
-       +
-Liveness Detection
-       +
-Anti-Spoofing
-       +
-Attendance Management
-       +
-Analytics
-       +
-Audit & Security
-
-into one unified attendance system.
-
-👨‍💻 Developer
-
-Kartik Gharte
-
-B.Tech —  Computer Science and engg
-
-GitHub: Kartik-gharte
-
-📄 License
-
-This project is currently being developed as an academic and experimental project.
+No license file is present in this repository. The project is currently presented as an academic and experimental project. Do not assume permission to reuse it beyond applicable law or the repository owner's instructions.
