@@ -2,9 +2,9 @@
 
 ## Status
 
-Documentation prepared and checks pass on `chore/project-foundation`, based on `main` at `79373d6`. Runtime behavior remains unverified.
+Documentation was merged in pull request #1 at commit `885cf7b`. Documentation checks passed; runtime behavior remains unverified.
 
-Repository operations (commit, push, pull request, merge) are performed only with explicit authorization. Obsolete remote feature branches were deleted with explicit authorization; see Git history for the final merge state.
+Repository operations (commit, push, pull request, merge) are performed only with explicit authorization. Obsolete remote feature branches were deleted with explicit authorization. The follow-up stabilization work is tracked in issue #13.
 
 ## Objective
 
@@ -94,18 +94,18 @@ Update this table before requesting review. Do not replace a pending check with 
 ## Risks
 
 - Documentation can drift from code; tie claims to files/lines and re-check before merge.
-- The worktree is uncommitted; a careless clean/reset would lose the draft. Do not run destructive Git commands.
+- This plan is a historical record of work completed on `chore/project-foundation`; future changes must use a new focused branch and PR.
 - GitHub network checks were intermittent during the audit; local Git state is authoritative for this branch.
 - Broad image/model ignore rules protect against accidental biometric commits but can also hide intentional documentation assets; review additions explicitly.
 
 ## Handoff / next step
 
-After review and explicit authorization:
+The foundation work was merged in pull request #1. Follow-up work is tracked in issue #13:
 
-1. Commit the documentation/templates with a `docs:` or `chore:` conventional message.
-2. Push `chore/project-foundation` and open a pull request using the new template.
-3. Merge without runtime changes; verify `main` still matches the known code state.
-4. Open the next issue: **Runtime bootstrap and verification**.
-5. Use branch `fix/runtime-bootstrap` for dependency manifest, portable configuration/model path, database initialization, and the broken test import.
+1. #2 — Runtime bootstrap: dependencies, configuration, portable models, and startup.
+2. #3 — SQLite schema initialization and configurable database path.
+3. #5 — Input validation, embedding-path containment, uploads, and error responses.
+4. #4 — Authentication and authorization.
+5. #7 — Automated tests and CI.
 
-Do not start runtime fixes on this branch.
+Use a new focused branch for each issue. Do not start runtime fixes on the historical foundation branch.
