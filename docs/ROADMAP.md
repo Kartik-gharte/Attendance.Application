@@ -29,7 +29,7 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 - [x] Replace the hardcoded Windows MediaPipe path with a portable setting.
 - [x] Provision models through a documented, non-committed mechanism.
 - [x] Verify startup, `/`, and `/docs`; document the tested platform and versions.
-- [ ] Call database initialization during application startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+- [x] Call database initialization during application startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
 - [ ] Validate `student_id` and constrain the embedding path ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
 - [ ] Fix or remove the broken `test_liveness_service.py` import ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
 - [ ] Make registration output paths project-relative and parameterized ([#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10)).
@@ -37,7 +37,7 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 **Exit criteria:** a fresh environment following [SETUP.md](SETUP.md) starts successfully and the verified commands/values are documented.
 
-**Branch:** `fix/runtime-bootstrap`
+**Branch:** `fix/database-initialization`
 
 ## Phase 2 — Automated tests and observability
 

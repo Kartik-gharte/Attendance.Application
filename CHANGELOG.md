@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Validated configuration in `app/core/config.py` backed by environment variables and a project-root `.env` file.
 - `.env.example` with placeholders for model, embedding, database, CORS, recognition, and liveness settings.
 - Pinned runtime dependencies in `requirements.txt` and development dependencies in `requirements-dev.txt`.
-- Focused runtime tests under `tests/runtime/` for settings, lifespan wiring, `/`, `/docs`, missing-model failure, and database-path creation.
+- Focused runtime tests under `tests/runtime/` for settings, lifespan wiring, `/`, `/docs`, missing-model failure, database initialization, retrieval, and duplicate handling with fake model services.
 - FastAPI lifespan-managed service construction with a shared `LivenessService` and `FaceRecognitionService`.
 
 ### Changed
@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Replaced the hardcoded Windows MediaPipe path with `MEDIAPIPE_FACE_LANDMARKER_MODEL`.
 - Replaced import-time service construction and duplicate model loading with a single lifespan startup path.
 - Made the embedding directory, SQLite path, CORS origins, face threshold, liveness validity, and InsightFace cache configurable.
-- `get_connection()` now honors `ATTENDANCE_DB_PATH` while still leaving schema initialization to issue #3.
+- `get_connection()` now honors `ATTENDANCE_DB_PATH`, and attendance routes use the configured database path from the app state. The FastAPI lifespan now calls `initialize_database()` before constructing model services and marks the database initialized.
 - Updated setup, configuration, architecture, database, testing, roadmap, status, known-issue, and decision documentation with verified runtime behavior.
 
 ### Repository
@@ -35,7 +35,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Known gaps
 
-- Database initialization is still not called during application startup (issue #3).
 - No full automated test suite or CI workflow exists (issue #7).
 - No authentication or authorization is implemented (issue #4).
 - Input validation, upload limits, and error sanitization are still missing (issue #5).

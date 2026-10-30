@@ -11,6 +11,7 @@ This document describes the endpoints implemented in the current code. FastAPI's
 - There are no Pydantic request/response models for these routes; field validation is limited to FastAPI's required-field checks and Python string handling.
 - CORS allows credentials from the origins in `CORS_ALLOWED_ORIGINS`. The default is `http://127.0.0.1:5500`, `http://localhost:5500`, `http://127.0.0.1:5173`, and `http://localhost:5173`.
 - Liveness sessions are stored in process memory and are not shared between workers or restarts.
+- The `attendance` table is initialized idempotently during application startup. Retrieval against a fresh initialized database returns an empty list.
 
 ## Endpoint summary
 
@@ -236,11 +237,11 @@ The route catches `Exception` and returns:
 }
 ```
 
-This may expose internal details. A missing database table currently falls into this path because the insert raises `sqlite3.OperationalError`, which is not converted to a specific response.
+This may expose internal details. Unexpected database errors also fall into this path.
 
 **Side effects:** writes a temporary file (deleted in `finally`), loads models, may insert an attendance row, and removes the liveness session after rejection or a database attempt. Pre-verification failures do not consume the session, except expiry.
 
-**Dependencies:** the student's embedding must exist; the database table must exist for inserts and queries.
+**Dependencies:** the student's embedding must exist; the database schema is initialized at startup for the configured path.
 
 ---
 
@@ -275,7 +276,7 @@ Returns all attendance records for one student, newest first by date and time.
 }
 ```
 
-**Failure behavior:** no route-level error handling. If the `attendance` table does not exist, SQLite raises an error that FastAPI returns as an HTTP `500`.
+**Failure behavior:** no route-level error handling. If the configured database cannot be opened or queried, SQLite raises an error that FastAPI returns as an HTTP `500`. A fresh initialized database returns an empty list.
 
 ---
 

@@ -8,6 +8,7 @@ from app.api.liveness_routes import router as liveness_router
 from app.api.routes import router
 from app.core.config import Settings, get_settings
 from app.core.services import AppServices, build_services
+from app.database.attendance_db import initialize_database
 
 
 ServiceFactory = Callable[[Settings], AppServices]
@@ -22,6 +23,12 @@ def create_app(
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         application.state.settings = app_settings
+
+        initialize_database(app_settings.database_path)
+
+        application.state.database_initialized = True
+
+        print("Database schema initialized")
 
         services = service_factory(app_settings)
 

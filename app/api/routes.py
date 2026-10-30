@@ -178,7 +178,8 @@ async def verify_attendance(
             liveness_status=result.get("liveness"),
             face_status=result.get("face"),
             similarity=result.get("similarity"),
-            attendance_status="PRESENT"
+            attendance_status="PRESENT",
+            database_path=request.app.state.settings.database_path
         )
 
         print("======================================")
@@ -285,6 +286,7 @@ async def verify_attendance(
 
 @router.get("/attendance/student/{student_id}")
 def get_student_attendance(
+    request: Request,
     student_id: str
 ):
 
@@ -292,7 +294,10 @@ def get_student_attendance(
         get_student_attendance as fetch_student_attendance
     )
 
-    records = fetch_student_attendance(student_id)
+    records = fetch_student_attendance(
+        student_id,
+        database_path=request.app.state.settings.database_path
+    )
 
     return {
         "status": "success",
@@ -307,13 +312,15 @@ def get_student_attendance(
 # =========================================================
 
 @router.get("/attendance/all")
-def get_all_attendance():
+def get_all_attendance(request: Request):
 
     from app.database.attendance_db import (
         get_all_attendance as fetch_all_attendance
     )
 
-    records = fetch_all_attendance()
+    records = fetch_all_attendance(
+        database_path=request.app.state.settings.database_path
+    )
 
     return {
         "status": "success",

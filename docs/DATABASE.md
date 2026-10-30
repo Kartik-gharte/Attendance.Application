@@ -47,16 +47,16 @@ The unique constraint prevents more than one record for the same student, lectur
 
 ## Initialization status
 
-`initialize_database()` exists in `app/database/attendance_db.py` and would create the table if called. **It is not called anywhere in the application.** `get_connection()` only creates the configured parent directory and opens the database; it does not create tables.
+`initialize_database()` is called from the FastAPI lifespan before model services are constructed. It:
 
-Consequences:
+1. Creates the configured parent directory through `get_connection()`.
+2. Runs `CREATE TABLE IF NOT EXISTS attendance` with the existing schema and unique constraint.
+3. Commits, closes the connection in `finally`, sets `app.state.database_initialized = True`, and prints `Database schema initialized`.
 
-- A fresh database has no `attendance` table.
-- `mark_attendance()` raises `sqlite3.OperationalError` (`no such table: attendance`), which is not caught by its `IntegrityError` handler.
-- `GET /attendance/student/{id}` and `GET /attendance/all` raise an unhandled error, which FastAPI returns as HTTP `500`.
-- `POST /attendance/verify` catches the error in its generic `except Exception` block and returns `status: "error"` with the SQLite message.
+The operation is idempotent, so restarting against an existing database preserves rows. A failure during initialization aborts startup and closes the connection. `get_connection()` itself only creates the parent directory and opens the database; it does not create tables.
 
-This is a confirmed runtime blocker, documented in [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Do not claim fresh-database initialization works.
+Fresh initialization, restart preservation, API retrieval, and duplicate rejection are covered by focused tests without loading real models:
+`tests/runtime/test_database_path.py`, `tests/runtime/test_app_startup.py`, and `tests/runtime/test_attendance_api.py`.
 
 ## Write path
 
@@ -67,7 +67,7 @@ This is a confirmed runtime blocker, documented in [KNOWN_ISSUES.md](KNOWN_ISSUE
 3. Executes a parameterized `INSERT`.
 4. Commits and returns a success dictionary with the inserted row ID and timestamp.
 5. Catches `sqlite3.IntegrityError` and returns `{"success": False, "duplicate": True, ...}`.
-6. Does not close the connection if an exception other than `IntegrityError` occurs. The generic route handler does not close it either.
+6. Closes the connection in `finally`, including on unexpected errors.
 
 The route maps a duplicate result to `status: "duplicate"` and `attendance_status: "ALREADY_MARKED"`.
 
@@ -86,7 +86,7 @@ The route maps a duplicate result to `status: "duplicate"` and `attendance_statu
 
 ## Migrations
 
-There is no migration framework, schema version table, or upgrade path. The schema is created only by the unused `initialize_database()` helper. Any future schema change needs a documented migration strategy and a decision record.
+There is no migration framework, schema version table, or upgrade path. The schema is created by the idempotent `initialize_database()` startup path. Any future schema change needs a documented migration strategy and a decision record.
 
 ## Time handling
 
@@ -94,4 +94,6 @@ All timestamps are local server time (`datetime.now()`) without timezone informa
 
 ## Testing the database safely
 
-Set `ATTENDANCE_DB_PATH` to a temporary path before importing or starting the application, or pass a path directly to `get_connection(database_path=...)`. Do not write test records into a real local attendance database. Test isolation still requires calling `initialize_database()` explicitly until startup initialization lands in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3).
+Set `ATTENDANCE_DB_PATH` to a temporary path before importing or starting the application, or construct `Settings(database_path=...)` and pass it to `create_app()`. The lifespan initializes the schema for that path, and attendance routes use the path stored on `app.state.settings`.
+
+Database helpers also accept an explicit `database_path` argument for isolated tests. Do not write test records into a real local attendance database.

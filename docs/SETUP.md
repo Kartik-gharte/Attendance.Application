@@ -11,12 +11,12 @@ Runtime bootstrap is implemented and was verified on one documented platform:
 | Dependency install | Clean virtual environment + `python -m pip install -r requirements.txt` |
 | Startup | `python -m uvicorn app.main:app` reached "Application startup complete" |
 | Endpoints | `GET /` returned `200`; `GET /docs` returned `200` |
+| Database startup | A temporary database was created with the `attendance` table; restart preserved rows; duplicate insert was rejected |
 | Missing model | Startup failed with a `RuntimeError` naming `MEDIAPIPE_FACE_LANDMARKER_MODEL` |
 | Model services | MediaPipe and InsightFace each initialized once during startup |
 
-This does **not** mean the whole application is verified. Database schema
-initialization, authentication, input validation, tests/CI, and the end-to-end
-camera flow remain open. See the
+This does **not** mean the whole application is verified. Authentication, input
+validation, tests/CI, and the end-to-end camera flow remain open. See the
 [tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
 ## Supported Python version
@@ -96,9 +96,10 @@ Then open:
 - `http://127.0.0.1:8000/` — service message
 - `http://127.0.0.1:8000/docs` — OpenAPI UI
 
-Startup loads the models once. If the MediaPipe model is missing, the process
-exits with an error naming `MEDIAPIPE_FACE_LANDMARKER_MODEL`; `/` and `/docs`
-will not be available.
+Startup initializes the database schema, then loads the models once. If schema
+initialization fails, startup aborts. If the MediaPipe model is missing, the
+process exits with an error naming `MEDIAPIPE_FACE_LANDMARKER_MODEL`; `/` and
+`/docs` will not be available.
 
 ## Configuration
 
@@ -107,13 +108,24 @@ behavior are documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Database initialization
 
-`get_connection()` honors the configured `ATTENDANCE_DB_PATH` and creates its
-parent directory. **The `attendance` table is still not created at startup**
-because `initialize_database()` is not called. This remains a runtime blocker
-tracked in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3).
+The FastAPI lifespan calls `initialize_database()` for the configured
+`ATTENDANCE_DB_PATH` before constructing model services. It creates the parent
+directory and the `attendance` table if they do not exist, commits the schema,
+and sets `app.state.database_initialized = True`. Initialization is idempotent,
+so restarting against an existing database preserves rows.
 
-Until that issue is fixed, attendance inserts and queries can fail with
-`no such table: attendance` on a fresh database.
+To verify against a throwaway database:
+
+```bash
+ATTENDANCE_DB_PATH=/tmp/attendance-test.db \
+  python -m uvicorn app.main:app
+
+# In another terminal:
+sqlite3 /tmp/attendance-test.db '.schema attendance'
+```
+
+Delete the temporary database when finished. Do not point tests at a real
+attendance database.
 
 ## Manual client
 
@@ -152,15 +164,13 @@ See [TESTING.md](TESTING.md) for what is and is not covered.
 | Startup fails with `MediaPipe Face Landmarker model not found` | Model path is missing or wrong | Download the model and set `MEDIAPIPE_FACE_LANDMARKER_MODEL`. |
 | Startup fails while initializing InsightFace | `buffalo_l` is unavailable, the cache is not writable, or the download failed | Check `INSIGHTFACE_ROOT`, network access, and model licensing. |
 | `Registered face not found for student: ...` | Missing `FACE_EMBEDDING_DIR/<student_id>.npy` | Generate a consented test embedding; do not use real student data. |
-| `no such table: attendance` | Database schema is not initialized | Tracked in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3). |
+| `no such table: attendance` | Startup initialization did not run or used a different database path | Check `ATTENDANCE_DB_PATH` and startup logs for schema initialization. |
 | Camera cannot be opened | No camera, permission denied, or device in use | Check OS camera permissions and device access. |
 | Port already in use | Another server on port 8000 | Stop it or run Uvicorn on another port. |
 
 ## What is still unverified
 
 - Startup on Windows or Linux, or with any Python version other than 3.11.16.
-- Automatic creation of the `attendance` table.
 - A complete liveness + face-match + attendance flow with a camera.
-- Duplicate attendance behavior on a fresh database.
 - Recognition accuracy, liveness accuracy, and presentation-attack resistance.
-- Automated API/database coverage and CI.
+- Full API/database coverage beyond the focused runtime tests and CI.

@@ -45,52 +45,56 @@ def get_connection(database_path=None):
     return connection
 
 
-def initialize_database():
+def initialize_database(database_path=None):
     """
     Create the attendance table if it does not exist.
     """
 
-    connection = get_connection()
+    connection = get_connection(database_path)
 
-    cursor = connection.cursor()
+    try:
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cursor = connection.cursor()
 
-            student_id TEXT NOT NULL,
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            subject TEXT NOT NULL,
+                student_id TEXT NOT NULL,
 
-            lecture_id TEXT NOT NULL,
+                subject TEXT NOT NULL,
 
-            attendance_date TEXT NOT NULL,
+                lecture_id TEXT NOT NULL,
 
-            attendance_time TEXT NOT NULL,
+                attendance_date TEXT NOT NULL,
 
-            liveness_status TEXT NOT NULL,
+                attendance_time TEXT NOT NULL,
 
-            face_status TEXT NOT NULL,
+                liveness_status TEXT NOT NULL,
 
-            similarity REAL,
+                face_status TEXT NOT NULL,
 
-            attendance_status TEXT NOT NULL,
+                similarity REAL,
 
-            created_at TEXT NOT NULL,
+                attendance_status TEXT NOT NULL,
 
-            UNIQUE (
-                student_id,
-                lecture_id,
-                attendance_date
+                created_at TEXT NOT NULL,
+
+                UNIQUE (
+                    student_id,
+                    lecture_id,
+                    attendance_date
+                )
             )
+            """
         )
-        """
-    )
 
-    connection.commit()
+        connection.commit()
 
-    connection.close()
+    finally:
+
+        connection.close()
 
 
 # =========================================================
@@ -100,37 +104,42 @@ def initialize_database():
 def attendance_already_marked(
     student_id,
     lecture_id,
-    attendance_date
+    attendance_date,
+    database_path=None
 ):
     """
     Check whether a student has already marked
     attendance for the specified lecture and date.
     """
 
-    connection = get_connection()
+    connection = get_connection(database_path)
 
-    cursor = connection.cursor()
+    try:
 
-    cursor.execute(
-        """
-        SELECT id
-        FROM attendance
-        WHERE student_id = ?
-        AND lecture_id = ?
-        AND attendance_date = ?
-        """,
-        (
-            student_id,
-            lecture_id,
-            attendance_date
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM attendance
+            WHERE student_id = ?
+            AND lecture_id = ?
+            AND attendance_date = ?
+            """,
+            (
+                student_id,
+                lecture_id,
+                attendance_date
+            )
         )
-    )
 
-    row = cursor.fetchone()
+        row = cursor.fetchone()
 
-    connection.close()
+        return row is not None
 
-    return row is not None
+    finally:
+
+        connection.close()
 
 
 # =========================================================
@@ -144,7 +153,8 @@ def mark_attendance(
     liveness_status,
     face_status,
     similarity,
-    attendance_status
+    attendance_status,
+    database_path=None
 ):
     """
     Store a verified attendance record.
@@ -164,11 +174,11 @@ def mark_attendance(
         timespec="seconds"
     )
 
-    connection = get_connection()
-
-    cursor = connection.cursor()
+    connection = get_connection(database_path)
 
     try:
+
+        cursor = connection.cursor()
 
         cursor.execute(
             """
@@ -204,8 +214,6 @@ def mark_attendance(
 
         attendance_id = cursor.lastrowid
 
-        connection.close()
-
         return {
             "success": True,
             "attendance_id": attendance_id,
@@ -219,8 +227,6 @@ def mark_attendance(
 
     except sqlite3.IntegrityError:
 
-        connection.close()
-
         return {
             "success": False,
             "duplicate": True,
@@ -230,68 +236,83 @@ def mark_attendance(
             )
         }
 
+    finally:
+
+        connection.close()
+
 
 # =========================================================
 # GET STUDENT ATTENDANCE
 # =========================================================
 
-def get_student_attendance(student_id):
+def get_student_attendance(
+    student_id,
+    database_path=None
+):
     """
     Return all attendance records for a student.
     """
 
-    connection = get_connection()
+    connection = get_connection(database_path)
 
-    cursor = connection.cursor()
+    try:
 
-    cursor.execute(
-        """
-        SELECT *
-        FROM attendance
-        WHERE student_id = ?
-        ORDER BY attendance_date DESC,
-                 attendance_time DESC
-        """,
-        (student_id,)
-    )
+        cursor = connection.cursor()
 
-    rows = cursor.fetchall()
+        cursor.execute(
+            """
+            SELECT *
+            FROM attendance
+            WHERE student_id = ?
+            ORDER BY attendance_date DESC,
+                     attendance_time DESC
+            """,
+            (student_id,)
+        )
 
-    connection.close()
+        rows = cursor.fetchall()
 
-    return [
-        dict(row)
-        for row in rows
-    ]
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+    finally:
+
+        connection.close()
 
 
 # =========================================================
 # GET ALL ATTENDANCE
 # =========================================================
 
-def get_all_attendance():
+def get_all_attendance(database_path=None):
     """
     Return all attendance records.
     """
 
-    connection = get_connection()
+    connection = get_connection(database_path)
 
-    cursor = connection.cursor()
+    try:
 
-    cursor.execute(
-        """
-        SELECT *
-        FROM attendance
-        ORDER BY attendance_date DESC,
-                 attendance_time DESC
-        """
-    )
+        cursor = connection.cursor()
 
-    rows = cursor.fetchall()
+        cursor.execute(
+            """
+            SELECT *
+            FROM attendance
+            ORDER BY attendance_date DESC,
+                     attendance_time DESC
+            """
+        )
 
-    connection.close()
+        rows = cursor.fetchall()
 
-    return [
-        dict(row)
-        for row in rows
-    ]
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+    finally:
+
+        connection.close()

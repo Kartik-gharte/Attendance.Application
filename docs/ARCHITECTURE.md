@@ -30,9 +30,10 @@ flowchart LR
 - Exposes `GET /`.
 - Creates the module-level `app = create_app()` used by Uvicorn.
 
-Importing `app.main` does **not** load model assets. Models are created once,
-inside the FastAPI lifespan, when the server starts. `build_services()` creates
-one `LivenessService`, one `FaceRecognitionService`, and one
+Importing `app.main` does **not** load model assets or initialize the database.
+The FastAPI lifespan first initializes the configured SQLite schema, then
+creates models once when the server starts. `build_services()` creates one
+`LivenessService`, one `FaceRecognitionService`, and one
 `AttendanceVerificationService` that shares the same liveness and face
 instances. Services are stored on `app.state` and the MediaPipe detector is
 closed on shutdown.
@@ -51,7 +52,7 @@ requests.
 | `app/services/anti_spoofing.py` | Face-size, brightness, and Laplacian-variance screening. | Heuristic only; not a trained presentation-attack detector. |
 | `app/services/face_recognition.py` | InsightFace embedding extraction, multi-attempt detection, cosine similarity, registered-embedding loading. | Model name/cache/threshold/embedding directory come from settings; raises on missing/empty assets. |
 | `app/services/attendance_verification.py` | Combines liveness and face results into a final attendance decision. | Accepts shared service instances; standalone construction still works for manual scripts. |
-| `app/database/attendance_db.py` | SQLite connection, schema definition, insert/query helpers, duplicate detection. | Path comes from `ATTENDANCE_DB_PATH`; schema creation helper is not called at startup; local time without timezone; no migrations. |
+| `app/database/attendance_db.py` | SQLite connection, schema definition, insert/query helpers, duplicate detection. | Path comes from `ATTENDANCE_DB_PATH`; idempotent schema initialization runs at startup; local time without timezone; no migrations. |
 | `app/core/config.py` | Validated settings loaded from environment variables and `.env`. | Defaults are project-relative; model existence is checked at startup, not at config import. |
 | `app/services/register_face.py` | Manual face-registration script. | Hardcoded student ID, input filename, and relative output path; not an API. |
 | `app/services/recognize_face.py` | Manual recognition script. | Hardcoded paths and student ID; not an API. |
@@ -88,11 +89,12 @@ The liveness session is a bearer-like identifier: anyone who knows a session ID 
 ## Startup and configuration
 
 - `create_app()` loads a `Settings` object from environment variables and an optional project-root `.env` file.
-- The FastAPI lifespan calls `build_services(settings)` once, after settings validation and before serving requests.
+- The FastAPI lifespan calls `initialize_database(settings.database_path)`, then `build_services(settings)` once, before serving requests.
+- `initialize_database()` creates the parent directory and the idempotent `attendance` table, sets `app.state.database_initialized`, and closes its connection. Failure aborts startup.
 - `LivenessService` reads `MEDIAPIPE_FACE_LANDMARKER_MODEL` and raises an actionable error if the file is missing.
 - `FaceRecognitionService` reads `INSIGHTFACE_MODEL_NAME`, `INSIGHTFACE_ROOT`, `FACE_MATCH_THRESHOLD`, and `FACE_EMBEDDING_DIR`.
 - `AttendanceVerificationService` receives the same liveness and face instances used by the routes; services are not duplicated at import.
-- `app/database/attendance_db.py` reads `ATTENDANCE_DB_PATH`, but `initialize_database()` is still not called by the application ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+- Attendance routes pass `app.state.settings.database_path` to database helpers, so an explicit `Settings` object controls both startup and request-time persistence.
 
 Runtime dependencies are pinned in `requirements.txt`; development dependencies are in `requirements-dev.txt`. The verified platform is documented in [SETUP.md](SETUP.md).
 
