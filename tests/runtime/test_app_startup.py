@@ -1,3 +1,5 @@
+import sqlite3
+
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
@@ -30,7 +32,11 @@ class FakeAttendanceService:
     pass
 
 
-def test_lifespan_creates_services_and_serves_root_and_docs():
+def test_lifespan_initializes_database_and_serves_root_and_docs(
+    tmp_path
+):
+
+    database_path = tmp_path / "attendance.db"
 
     services = AppServices(
         liveness_service=FakeLivenessService(),
@@ -39,7 +45,10 @@ def test_lifespan_creates_services_and_serves_root_and_docs():
     )
 
     app = create_app(
-        settings=Settings(_env_file=None),
+        settings=Settings(
+            _env_file=None,
+            database_path=database_path,
+        ),
         service_factory=lambda settings: services,
     )
 
@@ -55,5 +64,18 @@ def test_lifespan_creates_services_and_serves_root_and_docs():
             app.state.attendance_service
             is services.attendance_service
         )
+        assert app.state.database_initialized is True
 
+    with sqlite3.connect(database_path) as connection:
+
+        table = connection.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+            AND name = 'attendance'
+            """
+        ).fetchone()
+
+    assert table == ("attendance",)
     assert services.liveness_service.closed is True
