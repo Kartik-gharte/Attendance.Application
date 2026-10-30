@@ -59,7 +59,7 @@ Status labels:
 | FR-07 | Extract a face embedding | Implemented (runtime unverified) | InsightFace `buffalo_l` in `face_recognition.py`. |
 | FR-08 | Compare embeddings | Implemented (runtime unverified) | Cosine similarity with a configurable threshold (default `0.40`). |
 | FR-09 | Verify attendance from liveness + face match | Implemented (runtime unverified) | `POST /attendance/verify`; rejects unless liveness session and face match are valid. |
-| FR-10 | Persist attendance in SQLite | Partially implemented | Insert/query functions exist, but `initialize_database()` has no call site. Fresh-database behavior is unverified and likely fails. |
+| FR-10 | Persist attendance in SQLite | Implemented (startup and persistence verified without models) | Startup creates the schema idempotently; inserts, retrieval, and duplicate rejection are covered by focused tests. End-to-end API verification with real models is still outstanding. |
 | FR-11 | Prevent duplicate attendance | Implemented (runtime unverified) | `UNIQUE (student_id, lecture_id, attendance_date)` plus `sqlite3.IntegrityError` handling. |
 | FR-12 | Retrieve attendance | Implemented (runtime unverified) | `GET /attendance/student/{student_id}` and `GET /attendance/all`. |
 | FR-13 | Expire and consume liveness sessions | Implemented (runtime unverified) | Configurable validity (default 30 seconds); session removed after rejection, success, or expiry. |
@@ -79,6 +79,7 @@ Status labels:
 | Privacy | Face embeddings and attendance databases are local and gitignored. No retention/deletion policy or consent workflow. |
 | Portability | Startup verified on macOS arm64. The MediaPipe path, embedding directory, database path, CORS origins, and InsightFace cache are configurable. Windows/Linux are unverified. |
 | Reproducibility | Runtime and development dependencies are pinned; a clean Python 3.11.16 virtual environment installed successfully. |
+| Persistence | A fresh configured database is initialized at startup; restart preserves rows; duplicate insertion is rejected. |
 | Performance | Unverified. Models load once during lifespan startup; SQLite calls are synchronous inside async routes. |
 | Accuracy | Unverified. No benchmark, dataset, false-accept/false-reject measurements, or calibration. |
 | Observability | `print()` statements only; no structured logging, metrics, or tracing. |

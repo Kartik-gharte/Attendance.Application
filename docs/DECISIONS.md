@@ -80,12 +80,19 @@ Record significant repository and architecture decisions here. Add new entries r
 - **Status:** Accepted
 - **Context:** Model services were constructed at import time with a hardcoded Windows path, and no configuration system existed.
 - **Decision:** Use a `pydantic-settings` `Settings` object backed by environment variables and a project-root `.env` file. Build the model services once in the FastAPI lifespan, store them on `app.state`, and inject the shared instances into routes and the attendance service. Missing MediaPipe assets fail startup with an actionable error.
-- **Consequences:** Importing `app.main` is lightweight and testable. Startup now requires the MediaPipe model unless a test provides a fake service factory. Database schema initialization remains separate ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+- **Consequences:** Importing `app.main` is lightweight and testable. Startup now requires the MediaPipe model unless a test provides a fake service factory. Database schema initialization was subsequently implemented in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3).
+
+## D-011 — Initialize the SQLite schema idempotently at startup
+
+- **Date:** 2026-10-30
+- **Status:** Accepted
+- **Context:** The configured database path was available, but a fresh database still lacked the `attendance` table because `initialize_database()` was not called during startup.
+- **Decision:** Initialize the attendance schema with `CREATE TABLE IF NOT EXISTS` in the FastAPI lifespan, using the configured `ATTENDANCE_DB_PATH`, before constructing model services. Pass the configured path to database operations and tests, and defer migrations until the runtime foundation is stable.
+- **Consequences:** Fresh databases are initialized automatically, restart behavior is idempotent, and focused tests can use temporary database paths. The SQLite database remains the current store, and migrations remain a future operational decision.
 
 ## Proposed decisions (not yet accepted)
 
 These are candidates for later phases; they are not implemented:
 
-- Initialize the database in the FastAPI lifespan ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
 - Add pytest-compatible unit/API tests with a temporary database and mocked model services ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
 - Add structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).

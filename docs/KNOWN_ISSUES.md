@@ -1,6 +1,6 @@
 # Known Issues
 
-These are confirmed gaps based on source inspection and repository state as of 2026-10-30. KI-001, KI-002, KI-009, and KI-013 were resolved by the runtime-bootstrap change; the remaining issues are still open.
+These are confirmed gaps based on source inspection and repository state as of 2026-10-30. KI-001, KI-002, KI-003, KI-009, and KI-013 are resolved; the remaining issues are still open.
 
 Severity is a triage aid, not a formal risk rating.
 
@@ -10,7 +10,7 @@ Severity is a triage aid, not a formal risk rating.
 | --- | --- | --- | --- |
 | KI-001 | Critical | Empty dependency manifest | Resolved |
 | KI-002 | Critical | Hardcoded Windows model path | Resolved |
-| KI-003 | Critical | Database schema is never initialized | Open |
+| KI-003 | Critical | Database schema is never initialized | Resolved |
 | KI-004 | Critical | No authentication or authorization | Open |
 | KI-005 | High | `student_id` is used in a filesystem path without validation | Open |
 | KI-006 | High | Liveness sessions are bearer-like and replayable | Open |
@@ -49,10 +49,11 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-003 — Database schema is never initialized
 
-- **Evidence:** `initialize_database()` is defined at `app/database/attendance_db.py:40` and has no call sites outside its definition.
-- **Impact:** A fresh database lacks the `attendance` table; insert/query calls can fail with `no such table: attendance`.
+- **Evidence:** `initialize_database()` was defined but had no call sites.
+- **Impact:** A fresh database lacked the `attendance` table; insert/query calls could fail with `no such table: attendance`.
 - **Proposed fix:** Initialize on application startup (lifespan) and in test setup; add a fresh-database test.
-- **Status:** Open; Phase 1 blocker.
+- **Resolution:** The FastAPI lifespan calls `initialize_database(settings.database_path)`, which creates the parent directory and table idempotently. Attendance routes use the configured path. Focused tests cover fresh creation, restart preservation, retrieval, and duplicate rejection.
+- **Status:** Resolved 2026-10-30.
 
 ### KI-004 — No authentication or authorization
 

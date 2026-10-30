@@ -2,11 +2,11 @@
 
 ## Current status
 
-Focused runtime tests exist under `tests/runtime/`. They cover settings validation, path resolution, the missing-model error, lifespan service wiring with a fake service factory, and configured database-parent creation. They do not load real models or open a camera.
+Focused runtime tests exist under `tests/runtime/`. They cover settings validation, path resolution, the missing-model error, lifespan service wiring with a fake service factory, database initialization, configured database paths, attendance retrieval, and duplicate handling using temporary databases and fake model services. They do not load real models or open a camera.
 
 The older files named `test_*.py` are still manual scripts that execute top-level code when imported or run. Do not run plain `pytest` against the whole `tests/` directory: collection imports those modules, which can load models, open a camera, exit the process, or require missing fixtures.
 
-Runtime verification of the liveness, face-recognition, and attendance flows was **not performed**. Database schema initialization is also still open ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+Runtime verification of the real liveness and face-recognition camera flow was **not performed**. SQLite schema initialization, retrieval, and duplicate handling were verified through focused runtime tests without loading real models.
 
 ## What was verified
 
@@ -15,7 +15,8 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 | Check | Result | Scope |
 | --- | --- | --- |
 | `python -m compileall -q app tests` | Passed | Syntax/bytecode compilation only. |
-| `python -m pytest tests/runtime -q` | Passed (8 tests) | Settings, lifespan wiring, `/`, `/docs`, missing-model failure, and database-path creation. |
+| `python -m pytest tests/runtime -q` | Passed (14 tests) | Settings, lifespan wiring, `/`, `/docs`, missing-model failure, database initialization, retrieval, and duplicate handling. |
+| Attendance API with temporary database and fake model services | Passed | Fresh retrieval returns an empty list; repeated insert maps to duplicate response. |
 | `python -m uvicorn app.main:app` | Startup complete | Real MediaPipe and InsightFace models loaded once each. |
 | `GET /` and `GET /docs` | `200` | Served after lifespan startup. |
 | Missing `MEDIAPIPE_FACE_LANDMARKER_MODEL` | Startup failed with `RuntimeError` | Names the setting that must be fixed. |
@@ -65,13 +66,13 @@ They verify syntax, focused runtime behavior, and diff hygiene. They do not prov
 Proposed for Phase 2 of the [roadmap](ROADMAP.md):
 
 1. Unit tests for `compare_faces`, EAR calculation, and anti-spoofing heuristics using synthetic arrays.
-2. Database tests against a temporary SQLite path, covering insert, duplicate protection, and queries.
-3. API tests with mocked model services, covering session validation, rejection, duplicate, and retrieval.
+2. Broaden database tests to additional insert, duplicate, and query cases.
+3. Expand API tests with mocked model services to cover session validation, rejection, duplicate, and retrieval.
 4. Liveness state-machine tests using synthetic frames or mocked detectors.
 5. Face-matching tests with synthetic or explicitly consented fixtures; never real student data.
 6. CI workflow that runs tests without a camera or model downloads.
 
-Test isolation now has a configurable database path and an app service factory, but broad API/database coverage is still outstanding ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+Temporary-database and fake-model-service API/database coverage now exists, but broad coverage is still outstanding ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
 
 ## Hardware and test-data requirements
 

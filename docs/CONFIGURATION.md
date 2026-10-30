@@ -20,7 +20,7 @@ working directory. `~` is expanded and paths are normalized with
 | --- | --- | --- | --- |
 | `MEDIAPIPE_FACE_LANDMARKER_MODEL` | `models/mediapipe/face_landmarker.task` | MediaPipe Face Landmarker `.task` file. | Must exist when the service starts. |
 | `FACE_EMBEDDING_DIR` | `data/face_embeddings` | Directory containing `<student_id>.npy` embeddings. | Path. |
-| `ATTENDANCE_DB_PATH` | `data/attendance.db` | SQLite database file. | Path. Schema startup initialization is still tracked in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3). |
+| `ATTENDANCE_DB_PATH` | `data/attendance.db` | SQLite database file. | Path; schema is initialized at startup. |
 | `CORS_ALLOWED_ORIGINS` | Local ports `5500` and `5173` on `127.0.0.1` and `localhost` | Comma-separated CORS origins. | Empty entries are ignored. |
 | `FACE_MATCH_THRESHOLD` | `0.40` | Cosine-similarity threshold for a face `MATCH`. | `0.0`–`1.0`. |
 | `LIVENESS_VALIDITY_SECONDS` | `30` | Window in which a verified liveness session can be used. | Positive integer. |
@@ -36,11 +36,14 @@ Do not commit `.env` or real credentials.
 lifespan handler. The lifespan:
 
 1. Stores the settings object on `app.state.settings`.
-2. Calls `build_services(settings)` once.
-3. Creates one `LivenessService`, one `FaceRecognitionService`, and one
+2. Calls `initialize_database(settings.database_path)`, which creates the parent
+   directory and the idempotent `attendance` schema, then sets
+   `app.state.database_initialized = True`.
+3. Calls `build_services(settings)` once.
+4. Creates one `LivenessService`, one `FaceRecognitionService`, and one
    `AttendanceVerificationService` that shares those instances.
-4. Stores the services on `app.state`.
-5. Closes the MediaPipe detector on shutdown.
+5. Stores the services on `app.state`.
+6. Closes the MediaPipe detector on shutdown.
 
 If the MediaPipe model file does not exist, startup fails with:
 
@@ -91,7 +94,6 @@ relative output paths. Parameterizing them is tracked in
 
 ## Not implemented
 
-- Database schema initialization during startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
 - Input validation and upload limits ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
 - Authentication and authorization ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)).
 - Structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).
