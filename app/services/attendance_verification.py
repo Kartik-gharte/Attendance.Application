@@ -4,12 +4,25 @@ from app.services.face_recognition import FaceRecognitionService
 
 class AttendanceVerificationService:
 
-    def __init__(self):
+    def __init__(
+        self,
+        liveness_service=None,
+        face_service=None
+    ):
 
         print("Initializing Attendance Verification Service...")
 
-        self.liveness_service = LivenessService()
-        self.face_service = FaceRecognitionService()
+        self.liveness_service = (
+            liveness_service
+            if liveness_service is not None
+            else LivenessService()
+        )
+
+        self.face_service = (
+            face_service
+            if face_service is not None
+            else FaceRecognitionService()
+        )
 
         print("Attendance Verification Service ready")
 

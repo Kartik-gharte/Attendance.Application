@@ -1,54 +1,64 @@
+from contextlib import asynccontextmanager
+from typing import Callable
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import router
 from app.api.liveness_routes import router as liveness_router
+from app.api.routes import router
+from app.core.config import Settings, get_settings
+from app.core.services import AppServices, build_services
 
 
-app = FastAPI(
-    title="AI Attendance System",
-    version="1.0.0"
-)
+ServiceFactory = Callable[[Settings], AppServices]
 
 
-# =========================================================
-# CORS
-# =========================================================
+def create_app(
+    settings: Settings | None = None,
+    service_factory: ServiceFactory = build_services,
+) -> FastAPI:
+    app_settings = settings or get_settings()
 
-app.add_middleware(
-    CORSMiddleware,
+    @asynccontextmanager
+    async def lifespan(application: FastAPI):
+        application.state.settings = app_settings
 
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "http://127.0.0.1:5173",
-        "http://localhost:5173"
-    ],
+        services = service_factory(app_settings)
 
-    allow_credentials=True,
+        application.state.services = services
+        application.state.liveness_service = services.liveness_service
+        application.state.face_service = services.face_service
+        application.state.attendance_service = services.attendance_service
 
-    allow_methods=["*"],
+        try:
+            yield
+        finally:
+            services.close()
 
-    allow_headers=["*"],
-)
+    application = FastAPI(
+        title="AI Attendance System",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=app_settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    application.include_router(router)
+    application.include_router(liveness_router)
+
+    @application.get("/")
+    def root():
+        return {
+            "message": "AI Attendance Service is running"
+        }
+
+    return application
 
 
-# =========================================================
-# ROUTES
-# =========================================================
-
-app.include_router(router)
-
-app.include_router(liveness_router)
-
-
-# =========================================================
-# ROOT
-# =========================================================
-
-@app.get("/")
-def root():
-
-    return {
-        "message": "AI Attendance Service is running"
-    }
+app = create_app()

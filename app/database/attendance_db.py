@@ -2,34 +2,42 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
+from app.core.config import get_settings
+
 
 # =========================================================
 # DATABASE PATH
 # =========================================================
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+def get_database_path():
+    """
+    Return the configured SQLite database path.
+    """
 
-DATA_DIR = BASE_DIR / "data"
-
-DATABASE_PATH = DATA_DIR / "attendance.db"
+    return get_settings().database_path
 
 
 # =========================================================
 # DATABASE INITIALIZATION
 # =========================================================
 
-def get_connection():
+def get_connection(database_path=None):
     """
     Create and return a SQLite database connection.
     """
 
-    DATA_DIR.mkdir(
+    path = Path(
+        database_path
+        or get_database_path()
+    )
+
+    path.parent.mkdir(
         parents=True,
         exist_ok=True
     )
 
     connection = sqlite3.connect(
-        str(DATABASE_PATH)
+        str(path)
     )
 
     connection.row_factory = sqlite3.Row

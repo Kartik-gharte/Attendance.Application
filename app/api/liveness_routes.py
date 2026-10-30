@@ -1,15 +1,11 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, Request, UploadFile, File
 import cv2
 import numpy as np
 import uuid
 import time
 
-from app.services.liveness import LivenessService
-
 
 router = APIRouter()
-
-liveness_service = LivenessService()
 
 
 # =========================================================
@@ -17,9 +13,6 @@ liveness_service = LivenessService()
 # =========================================================
 
 sessions = {}
-
-# How long a successful liveness session remains valid
-LIVENESS_VALIDITY_SECONDS = 30
 
 
 # =========================================================
@@ -51,9 +44,16 @@ async def start_liveness():
 
 @router.post("/liveness/frame")
 async def process_liveness_frame(
+    request: Request,
     session_id: str,
     image: UploadFile = File(...)
 ):
+
+    liveness_service = request.app.state.liveness_service
+
+    liveness_validity_seconds = (
+        request.app.state.settings.liveness_validity_seconds
+    )
 
     # -----------------------------------------------------
     # CHECK SESSION
@@ -81,7 +81,7 @@ async def process_liveness_frame(
         if (
             verified_at is not None
             and time.time() - verified_at
-            <= LIVENESS_VALIDITY_SECONDS
+            <= liveness_validity_seconds
         ):
 
             return {

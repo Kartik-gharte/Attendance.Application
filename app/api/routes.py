@@ -1,16 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, Request, UploadFile, File, Form
 import tempfile
 import os
 import time
 
-from app.services.attendance_verification import (
-    AttendanceVerificationService
-)
-
-from app.api.liveness_routes import (
-    sessions,
-    LIVENESS_VALIDITY_SECONDS
-)
+from app.api.liveness_routes import sessions
 
 from app.database.attendance_db import (
     mark_attendance
@@ -19,8 +12,6 @@ from app.database.attendance_db import (
 
 router = APIRouter()
 
-attendance_service = AttendanceVerificationService()
-
 
 # =========================================================
 # VERIFY ATTENDANCE
@@ -28,12 +19,19 @@ attendance_service = AttendanceVerificationService()
 
 @router.post("/attendance/verify")
 async def verify_attendance(
+    request: Request,
     student_id: str = Form(...),
     session_id: str = Form(...),
     subject: str = Form(...),
     lecture_id: str = Form(...),
     image: UploadFile = File(...)
 ):
+
+    attendance_service = request.app.state.attendance_service
+
+    liveness_validity_seconds = (
+        request.app.state.settings.liveness_validity_seconds
+    )
 
     temp_path = None
 
@@ -74,7 +72,7 @@ async def verify_attendance(
             "message": "Invalid liveness verification"
         }
 
-    if time.time() - verified_at > LIVENESS_VALIDITY_SECONDS:
+    if time.time() - verified_at > liveness_validity_seconds:
 
         sessions.pop(session_id, None)
 
