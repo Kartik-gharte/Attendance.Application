@@ -3,22 +3,47 @@ import numpy as np
 from pathlib import Path
 from insightface.app import FaceAnalysis
 
+from app.core.config import Settings, get_settings
+
 
 class FaceRecognitionService:
 
-    def __init__(self):
+    def __init__(self, settings: Settings | None = None):
+
+        self.settings = (
+            settings
+            if settings is not None
+            else get_settings()
+        )
+
+        self.embedding_dir = self.settings.embedding_dir
+
+        self.threshold = self.settings.face_match_threshold
 
         print("Loading InsightFace model...")
 
-        self.app = FaceAnalysis(
-            name="buffalo_l",
-            providers=["CPUExecutionProvider"]
-        )
+        try:
 
-        self.app.prepare(
-            ctx_id=0,
-            det_size=(640, 640)
-        )
+            self.app = FaceAnalysis(
+                name=self.settings.insightface_model_name,
+                root=str(self.settings.insightface_root),
+                providers=["CPUExecutionProvider"]
+            )
+
+            self.app.prepare(
+                ctx_id=0,
+                det_size=(640, 640)
+            )
+
+        except Exception as error:
+
+            raise RuntimeError(
+                "Failed to initialize InsightFace. Ensure "
+                "INSIGHTFACE_MODEL_NAME is available locally or "
+                "can be downloaded, and INSIGHTFACE_ROOT points "
+                "to a writable cache directory. "
+                f"{type(error).__name__}: {error}"
+            ) from error
 
         # Slightly lower detection threshold so
         # faces are easier to detect in webcam frames.
@@ -26,9 +51,6 @@ class FaceRecognitionService:
             self.app.det_model.det_thresh = 0.35
         except Exception:
             pass
-
-        # Face similarity threshold
-        self.threshold = 0.40
 
         print("InsightFace model loaded")
         print("Face Recognition Service ready")
@@ -461,16 +483,8 @@ class FaceRecognitionService:
         student_id
     ):
 
-        base_dir = (
-            Path(__file__)
-            .resolve()
-            .parents[2]
-        )
-
         registered_path = (
-            base_dir
-            / "data"
-            / "face_embeddings"
+            Path(self.embedding_dir)
             / f"{student_id}.npy"
         )
 

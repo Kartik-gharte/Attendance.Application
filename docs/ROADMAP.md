@@ -20,23 +20,24 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 **Exit criteria:** documentation matches the code, links and claims are reviewed, and the changes are merged without altering runtime behavior.
 
-## Phase 1 — Runtime bootstrap (next)
+## Phase 1 — Runtime bootstrap (in progress)
 
 **Goal:** make a fresh clone start predictably.
 
-- Define and pin a dependency manifest compatible with the chosen Python version.
-- Add a real configuration module or documented environment-variable loader.
-- Replace the hardcoded Windows MediaPipe path with a portable setting.
-- Provision models through a documented, non-committed mechanism.
-- Call database initialization during application startup.
-- Validate `student_id` and constrain the embedding path.
-- Fix or remove the broken `test_liveness_service.py` import.
-- Make registration output paths project-relative and parameterized.
-- Verify startup, `/`, `/docs`, database creation, and one consented end-to-end flow.
+- [x] Define and pin a dependency manifest compatible with the chosen Python version.
+- [x] Add a real configuration module or documented environment-variable loader.
+- [x] Replace the hardcoded Windows MediaPipe path with a portable setting.
+- [x] Provision models through a documented, non-committed mechanism.
+- [x] Verify startup, `/`, and `/docs`; document the tested platform and versions.
+- [ ] Call database initialization during application startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+- [ ] Validate `student_id` and constrain the embedding path ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
+- [ ] Fix or remove the broken `test_liveness_service.py` import ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+- [ ] Make registration output paths project-relative and parameterized ([#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10)).
+- [ ] Verify one consented end-to-end flow.
 
 **Exit criteria:** a fresh environment following [SETUP.md](SETUP.md) starts successfully and the verified commands/values are documented.
 
-**Candidate branch:** `fix/runtime-bootstrap`
+**Branch:** `fix/runtime-bootstrap`
 
 ## Phase 2 — Automated tests and observability
 

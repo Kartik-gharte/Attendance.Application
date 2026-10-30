@@ -9,7 +9,7 @@ This document describes the endpoints implemented in the current code. FastAPI's
 - Request bodies use multipart form data where files or `Form` fields are declared.
 - Application-level errors return a JSON object with `status: "error"` and typically HTTP `200`. Missing required form fields are rejected by FastAPI with HTTP `422`.
 - There are no Pydantic request/response models for these routes; field validation is limited to FastAPI's required-field checks and Python string handling.
-- CORS allows credentials from `http://127.0.0.1:5500`, `http://localhost:5500`, `http://127.0.0.1:5173`, and `http://localhost:5173`.
+- CORS allows credentials from the origins in `CORS_ALLOWED_ORIGINS`. The default is `http://127.0.0.1:5500`, `http://localhost:5500`, `http://127.0.0.1:5173`, and `http://localhost:5173`.
 - Liveness sessions are stored in process memory and are not shared between workers or restarts.
 
 ## Endpoint summary
@@ -105,7 +105,7 @@ If the session is already verified and still valid, the route returns a success 
 | Condition | Response |
 | --- | --- |
 | Unknown session | `{"status": "error", "message": "Invalid or expired liveness session"}` |
-| Verified session older than 30 seconds | Session is deleted; `{"status": "error", "message": "Liveness session expired"}` |
+| Verified session older than `LIVENESS_VALIDITY_SECONDS` (default 30) | Session is deleted; `{"status": "error", "message": "Liveness session expired"}` |
 | Undecodable image | `{"status": "error", "message": "Could not decode image"}` |
 
 **Not exposed in the response:** `LivenessService.process_frame` returns an `anti_spoofing` object, but the route does not include it. The screening result affects the internal `liveness_verified` decision.
@@ -122,8 +122,8 @@ Verifies a liveness session and a face image, then attempts to persist attendanc
 
 | Name | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `student_id` | string | Yes | Used to locate `data/face_embeddings/<student_id>.npy`. Not authenticated. |
-| `session_id` | string | Yes | Must be liveness-verified and less than 30 seconds old. |
+| `student_id` | string | Yes | Used to locate `<FACE_EMBEDDING_DIR>/<student_id>.npy`. Not authenticated. |
+| `session_id` | string | Yes | Must be liveness-verified and less than `LIVENESS_VALIDITY_SECONDS` old. |
 | `subject` | string | Yes | Stored as provided; no validation. |
 | `lecture_id` | string | Yes | Stored as provided; no validation. |
 | `image` | file | Yes | Final face image. |
@@ -148,7 +148,7 @@ These return HTTP `200` with an error object:
 | Unknown session | `{"status": "error", "message": "Invalid or expired liveness session"}` |
 | Session exists but is not liveness-verified | `{"status": "error", "message": "Liveness verification required"}` |
 | Missing verification timestamp | `{"status": "error", "message": "Invalid liveness verification"}` |
-| Verification older than 30 seconds | Session removed; `{"status": "error", "message": "Liveness session expired"}` |
+| Verification older than `LIVENESS_VALIDITY_SECONDS` (default 30) | Session removed; `{"status": "error", "message": "Liveness session expired"}` |
 
 ### Rejected face
 

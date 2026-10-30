@@ -23,25 +23,36 @@ flowchart LR
 
 `app/main.py`:
 
-- Creates the FastAPI application (`title="AI Attendance System"`, `version="1.0.0"`).
-- Configures CORS for `127.0.0.1`/`localhost` on ports `5500` and `5173`, with credentials enabled and all methods/headers allowed.
+- Exposes `create_app(settings=None, service_factory=build_services)` for explicit app construction and testing.
+- Loads validated settings from `app/core/config.py`.
+- Configures CORS from `CORS_ALLOWED_ORIGINS`, with credentials enabled and all methods/headers allowed.
 - Registers the attendance router and the liveness router.
 - Exposes `GET /`.
+- Creates the module-level `app = create_app()` used by Uvicorn.
 
-Importing the application has side effects: both routers construct service objects at module import time, which loads MediaPipe and InsightFace models. A missing model therefore prevents the application from importing and starting.
+Importing `app.main` does **not** load model assets. Models are created once,
+inside the FastAPI lifespan, when the server starts. `build_services()` creates
+one `LivenessService`, one `FaceRecognitionService`, and one
+`AttendanceVerificationService` that shares the same liveness and face
+instances. Services are stored on `app.state` and the MediaPipe detector is
+closed on shutdown.
+
+If the MediaPipe model is missing, lifespan startup raises a `RuntimeError`
+naming `MEDIAPIPE_FACE_LANDMARKER_MODEL`, so the process exits before serving
+requests.
 
 ## Components
 
 | Component | Responsibility | Current constraints |
 | --- | --- | --- |
-| `app/api/liveness_routes.py` | Session creation, frame decoding, session state, liveness responses. | In-memory `sessions` dict; single process; 30-second validity; constructs a `LivenessService` at import. |
-| `app/api/routes.py` | Attendance verification, temporary image handling, database insert, attendance retrieval. | Constructs `AttendanceVerificationService` at import; synchronous SQLite calls in an async handler; no authentication. |
-| `app/services/liveness.py` | MediaPipe Face Landmarker, Eye Aspect Ratio, blink state machine, anti-spoofing invocation. | Hardcoded Windows model path; two-frame-state values passed by the route. |
+| `app/api/liveness_routes.py` | Session creation, frame decoding, session state, liveness responses. | In-memory `sessions` dict; single process; configurable validity (default 30 seconds); uses the shared service from `app.state`. |
+| `app/api/routes.py` | Attendance verification, temporary image handling, database insert, attendance retrieval. | Uses the shared service from `app.state`; synchronous SQLite calls in an async handler; no authentication. |
+| `app/services/liveness.py` | MediaPipe Face Landmarker, Eye Aspect Ratio, blink state machine, anti-spoofing invocation. | Model path comes from `MEDIAPIPE_FACE_LANDMARKER_MODEL`; fails fast if the file is missing. |
 | `app/services/anti_spoofing.py` | Face-size, brightness, and Laplacian-variance screening. | Heuristic only; not a trained presentation-attack detector. |
-| `app/services/face_recognition.py` | InsightFace embedding extraction, multi-attempt detection, cosine similarity, registered-embedding loading. | Loads `buffalo_l`; hardcoded `data/face_embeddings/<id>.npy`; threshold `0.40`; raises on missing/empty assets. |
-| `app/services/attendance_verification.py` | Combines liveness and face results into a final attendance decision. | Constructs both liveness and face services; no independent anti-spoofing verdict beyond liveness state. |
-| `app/database/attendance_db.py` | SQLite connection, schema definition, insert/query helpers, duplicate detection. | Schema creation helper is not called at startup; local time without timezone; no migrations. |
-| `app/core/config.py` | Intended configuration module. | Empty; all settings are hardcoded elsewhere. |
+| `app/services/face_recognition.py` | InsightFace embedding extraction, multi-attempt detection, cosine similarity, registered-embedding loading. | Model name/cache/threshold/embedding directory come from settings; raises on missing/empty assets. |
+| `app/services/attendance_verification.py` | Combines liveness and face results into a final attendance decision. | Accepts shared service instances; standalone construction still works for manual scripts. |
+| `app/database/attendance_db.py` | SQLite connection, schema definition, insert/query helpers, duplicate detection. | Path comes from `ATTENDANCE_DB_PATH`; schema creation helper is not called at startup; local time without timezone; no migrations. |
+| `app/core/config.py` | Validated settings loaded from environment variables and `.env`. | Defaults are project-relative; model existence is checked at startup, not at config import. |
 | `app/services/register_face.py` | Manual face-registration script. | Hardcoded student ID, input filename, and relative output path; not an API. |
 | `app/services/recognize_face.py` | Manual recognition script. | Hardcoded paths and student ID; not an API. |
 | `app/services/combined_test.py` | Standalone camera test combining liveness and recognition. | Windows-specific paths; duplicates logic from services; not part of the API. |
@@ -66,24 +77,24 @@ The liveness session is a bearer-like identifier: anyone who knows a session ID 
 ## Attendance flow
 
 1. `POST /attendance/verify` requires `student_id`, `session_id`, `subject`, `lecture_id`, and an image.
-2. The route validates that the session exists, is liveness-verified, has a timestamp, and is not older than 30 seconds.
+2. The route validates that the session exists, is liveness-verified, has a timestamp, and is not older than `LIVENESS_VALIDITY_SECONDS` (default 30).
 3. The uploaded image is written to a temporary file and passed to `AttendanceVerificationService.verify_face`.
-4. `FaceRecognitionService.recognize` loads the image, extracts an embedding using up to five detection attempts, loads `data/face_embeddings/<student_id>.npy`, and computes cosine similarity.
-5. A similarity of at least `0.40` is considered a `MATCH`.
+4. `FaceRecognitionService.recognize` loads the image, extracts an embedding using up to five detection attempts, loads `<FACE_EMBEDDING_DIR>/<student_id>.npy`, and computes cosine similarity.
+5. A similarity of at least `FACE_MATCH_THRESHOLD` (default `0.40`) is considered a `MATCH`.
 6. The route combines the face result with the already-validated liveness session. A non-match returns `rejected` and consumes the session.
 7. On a match, `mark_attendance` inserts a row. A uniqueness conflict returns a duplicate result. The session is consumed in both cases.
 8. The temporary file is deleted in `finally`.
 
 ## Startup and configuration
 
-- `app/api/routes.py:22` instantiates `AttendanceVerificationService` at import.
-- That service constructs a `LivenessService` and a `FaceRecognitionService`.
-- `app/api/liveness_routes.py:12` constructs a second `LivenessService`.
-- `LivenessService` reads a hardcoded Windows model path (`app/services/liveness.py:13`).
-- `requirements.txt` is empty; `app/core/config.py` is empty.
-- `initialize_database()` exists in `app/database/attendance_db.py:40` but is not called by the application.
+- `create_app()` loads a `Settings` object from environment variables and an optional project-root `.env` file.
+- The FastAPI lifespan calls `build_services(settings)` once, after settings validation and before serving requests.
+- `LivenessService` reads `MEDIAPIPE_FACE_LANDMARKER_MODEL` and raises an actionable error if the file is missing.
+- `FaceRecognitionService` reads `INSIGHTFACE_MODEL_NAME`, `INSIGHTFACE_ROOT`, `FACE_MATCH_THRESHOLD`, and `FACE_EMBEDDING_DIR`.
+- `AttendanceVerificationService` receives the same liveness and face instances used by the routes; services are not duplicated at import.
+- `app/database/attendance_db.py` reads `ATTENDANCE_DB_PATH`, but `initialize_database()` is still not called by the application ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
 
-These are current implementation facts, not a recommended design. Phase 1 of the [roadmap](ROADMAP.md) covers portable configuration, dependency declaration, and reliable startup.
+Runtime dependencies are pinned in `requirements.txt`; development dependencies are in `requirements-dev.txt`. The verified platform is documented in [SETUP.md](SETUP.md).
 
 ## Current vs future architecture
 
@@ -91,8 +102,7 @@ These are current implementation facts, not a recommended design. Phase 1 of the
 
 **Proposed future (not implemented):**
 
-- Configuration via environment variables and a validated settings object.
-- Lazy model loading with explicit readiness/error handling.
+- Readiness/health endpoints that report model and database state.
 - Shared session storage (for multiple workers) with expiry and one-time use.
 - Authentication and role-based authorization.
 - Async or thread-safe database access and migrations.

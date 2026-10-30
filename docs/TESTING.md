@@ -2,18 +2,25 @@
 
 ## Current status
 
-There is **no automated pytest suite**. The files named `test_*.py` are manual scripts that execute top-level code when imported or run. They are not safe to collect with pytest: collection imports the modules, which can load models, open a camera, exit the process, or require missing fixtures.
+Focused runtime tests exist under `tests/runtime/`. They cover settings validation, path resolution, the missing-model error, lifespan service wiring with a fake service factory, and configured database-parent creation. They do not load real models or open a camera.
 
-Runtime verification of the liveness, face-recognition, API, and database flows was **not performed** during the documentation foundation task.
+The older files named `test_*.py` are still manual scripts that execute top-level code when imported or run. Do not run plain `pytest` against the whole `tests/` directory: collection imports those modules, which can load models, open a camera, exit the process, or require missing fixtures.
 
-## What was verified in this task
+Runtime verification of the liveness, face-recognition, and attendance flows was **not performed**. Database schema initialization is also still open ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+
+## What was verified
+
+On macOS 27.0.1 arm64 with Python 3.11.16:
 
 | Check | Result | Scope |
 | --- | --- | --- |
-| `python -m compileall -q app tests test_api_attendance.py test_liveness_service.py` | Passed | Syntax/bytecode compilation only. It does not import models or verify runtime behavior. |
-| `git diff --check` | Passed | Whitespace/conflict-marker check, including untracked files marked intent-to-add. |
+| `python -m compileall -q app tests` | Passed | Syntax/bytecode compilation only. |
+| `python -m pytest tests/runtime -q` | Passed (8 tests) | Settings, lifespan wiring, `/`, `/docs`, missing-model failure, and database-path creation. |
+| `python -m uvicorn app.main:app` | Startup complete | Real MediaPipe and InsightFace models loaded once each. |
+| `GET /` and `GET /docs` | `200` | Served after lifespan startup. |
+| Missing `MEDIAPIPE_FACE_LANDMARKER_MODEL` | Startup failed with `RuntimeError` | Names the setting that must be fixed. |
 
-The compile check ran with the Python interpreter available in the development environment. It does not establish that the same Python version works with FastAPI, MediaPipe, InsightFace, or the native model assets.
+The compile and test checks do not establish that the same Python version works on another platform, nor do they cover the camera-based flows.
 
 ## Manual scripts
 
@@ -46,11 +53,12 @@ Do not modify a test merely to make it pass. Convert or replace these scripts on
 These do not require model assets or a camera:
 
 ```bash
-python -m compileall -q app tests test_api_attendance.py test_liveness_service.py
+python -m compileall -q app tests
+python -m pytest tests/runtime -q
 git diff --check
 ```
 
-They verify only syntax and diff hygiene. They do not prove application behavior.
+They verify syntax, focused runtime behavior, and diff hygiene. They do not prove the camera-based flows.
 
 ## Future automated test plan
 
@@ -63,7 +71,7 @@ Proposed for Phase 2 of the [roadmap](ROADMAP.md):
 5. Face-matching tests with synthetic or explicitly consented fixtures; never real student data.
 6. CI workflow that runs tests without a camera or model downloads.
 
-Test isolation requires a configurable database path and dependency injection; neither exists yet.
+Test isolation now has a configurable database path and an app service factory, but broad API/database coverage is still outstanding ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
 
 ## Hardware and test-data requirements
 

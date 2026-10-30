@@ -16,8 +16,8 @@ This directory contains the authoritative project documentation. Source code rem
 
 ## Setup and configuration
 
-- [Setup](SETUP.md) — prerequisites, current blockers, and intended startup workflow.
-- [Configuration](CONFIGURATION.md) — hardcoded settings and proposed configuration.
+- [Setup](SETUP.md) — verified install/startup workflow, model provisioning, and remaining blockers.
+- [Configuration](CONFIGURATION.md) — environment variables, defaults, path resolution, and startup behavior.
 
 ## Testing and security
 

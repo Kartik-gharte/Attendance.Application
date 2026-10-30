@@ -66,11 +66,26 @@ Record significant repository and architecture decisions here. Add new entries r
 - **Decision:** Do not replace the database or add migrations in the foundation change. Document the schema and the initialization gap.
 - **Consequences:** SQLite remains a development-store assumption. Revisit when concurrency, deployment, or multi-user requirements are defined.
 
+## D-009 — Python 3.11 and pinned requirements
+
+- **Date:** 2026-10-30
+- **Status:** Accepted
+- **Context:** A reproducible install requires a documented interpreter and dependency set compatible with MediaPipe, InsightFace, ONNX Runtime, and OpenCV on the development platform.
+- **Decision:** Target Python 3.11 and pin direct runtime dependencies in `requirements.txt`; keep test-only dependencies in `requirements-dev.txt`. Record the verified platform and versions in [SETUP.md](SETUP.md).
+- **Consequences:** The manifest is reproducible for the verified platform. Other Python versions and platforms must be tested before being claimed as supported. MediaPipe and InsightFace both declare OpenCV packages, so both `opencv-python` and `opencv-contrib-python` are pinned to the same version.
+
+## D-010 — Validated settings and lifespan-managed shared services
+
+- **Date:** 2026-10-30
+- **Status:** Accepted
+- **Context:** Model services were constructed at import time with a hardcoded Windows path, and no configuration system existed.
+- **Decision:** Use a `pydantic-settings` `Settings` object backed by environment variables and a project-root `.env` file. Build the model services once in the FastAPI lifespan, store them on `app.state`, and inject the shared instances into routes and the attendance service. Missing MediaPipe assets fail startup with an actionable error.
+- **Consequences:** Importing `app.main` is lightweight and testable. Startup now requires the MediaPipe model unless a test provides a fake service factory. Database schema initialization remains separate ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+
 ## Proposed decisions (not yet accepted)
 
-These are candidates for Phase 1/2; they are not implemented:
+These are candidates for later phases; they are not implemented:
 
-- Initialize the database in a FastAPI lifespan and fail fast if required models are missing.
-- Introduce a typed, validated configuration module backed by documented environment variables.
-- Inject shared model services instead of constructing them at import time.
-- Add pytest-compatible unit/API tests with a temporary database and mocked model services.
+- Initialize the database in the FastAPI lifespan ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+- Add pytest-compatible unit/API tests with a temporary database and mocked model services ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+- Add structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).

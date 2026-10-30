@@ -11,8 +11,8 @@ The system processes:
 | Data | Where it appears | Sensitivity |
 | --- | --- | --- |
 | Face images / webcam frames | HTTP uploads; the final attendance image is briefly written to a temporary file | High — biometric identifiers. |
-| Face embeddings (`.npy`) | `data/face_embeddings/<student_id>.npy` | High — derived biometric data. |
-| Attendance records | `data/attendance.db` | Personal data (student ID, subject, lecture, timestamps, similarity). |
+| Face embeddings (`.npy`) | `FACE_EMBEDDING_DIR/<student_id>.npy` (default `data/face_embeddings/`) | High — derived biometric data. |
+| Attendance records | `ATTENDANCE_DB_PATH` (default `data/attendance.db`) | Personal data (student ID, subject, lecture, timestamps, similarity). |
 | Liveness session IDs | Process memory, query strings, client state | Sensitive short-lived capability. |
 | Console logs | Standard output | May contain student IDs, subject/lecture IDs, filenames, similarity, and error text. |
 
@@ -22,10 +22,10 @@ The system processes:
 
 - SQL queries use parameterized statements.
 - Uploaded attendance images are written to a temporary file and deleted in a `finally` block.
-- Liveness sessions expire 30 seconds after verification; they are consumed after a face-verification rejection or a database insert attempt.
-- CORS is limited to local development origins.
+- Liveness sessions expire after `LIVENESS_VALIDITY_SECONDS` (default 30); they are consumed after a face-verification rejection or a database insert attempt.
+- CORS defaults to local development origins and is configurable through `CORS_ALLOWED_ORIGINS`. CORS is not an access-control mechanism.
 - Face images, embeddings, databases, and model files are excluded from Git.
-- Face matching requires a single detected face and a similarity of at least `0.40`.
+- Face matching requires a single detected face and a similarity of at least `FACE_MATCH_THRESHOLD` (default `0.40`).
 
 ## Current gaps and risks
 
@@ -43,7 +43,7 @@ Every endpoint is open. Anyone who can reach the API can start sessions, submit 
 
 ### Path construction from user input
 
-`student_id` is interpolated directly into `data/face_embeddings/<student_id>.npy` without validation (`app/services/face_recognition.py:470-475`). Values containing path separators, `..`, or an absolute path could escape the embedding directory. Restrict identifiers to a safe pattern and verify the resolved path stays inside the embedding directory.
+`student_id` is interpolated directly into `<FACE_EMBEDDING_DIR>/<student_id>.npy` without validation (`app/services/face_recognition.py`). Values containing path separators, `..`, or an absolute path could escape the embedding directory. Restrict identifiers to a safe pattern and verify the resolved path stays inside the embedding directory.
 
 ### Input validation
 

@@ -3,8 +3,9 @@
 ## Technology and location
 
 - Engine: SQLite via Python's standard-library `sqlite3`.
-- Path: `<repository-root>/data/attendance.db`, derived from `app/database/attendance_db.py`.
-- The `data/` directory is created by `get_connection()` if it does not exist.
+- Path: `ATTENDANCE_DB_PATH`, defaulting to `<repository-root>/data/attendance.db`.
+- Relative paths are resolved against the repository root by `app/core/config.py`.
+- The parent directory is created by `get_connection()` if it does not exist.
 - `data/` and all `*.db` files are ignored by Git. Do not commit local or production attendance databases.
 
 ## Schema
@@ -46,7 +47,7 @@ The unique constraint prevents more than one record for the same student, lectur
 
 ## Initialization status
 
-`initialize_database()` exists at `app/database/attendance_db.py:40` and would create the table if called. **It is not called anywhere in the application.** `get_connection()` only creates the `data/` directory and opens the database; it does not create tables.
+`initialize_database()` exists in `app/database/attendance_db.py` and would create the table if called. **It is not called anywhere in the application.** `get_connection()` only creates the configured parent directory and opens the database; it does not create tables.
 
 Consequences:
 
@@ -93,4 +94,4 @@ All timestamps are local server time (`datetime.now()`) without timezone informa
 
 ## Testing the database safely
 
-For future tests, point the database at a temporary path or use dependency injection; do not write test records into a real local attendance database. The current code hardcodes the database path, so isolation requires a code change (Phase 1/2 work, not part of the documentation foundation).
+Set `ATTENDANCE_DB_PATH` to a temporary path before importing or starting the application, or pass a path directly to `get_connection(database_path=...)`. Do not write test records into a real local attendance database. Test isolation still requires calling `initialize_database()` explicitly until startup initialization lands in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3).

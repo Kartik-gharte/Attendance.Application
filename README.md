@@ -12,7 +12,7 @@
 </p>
 
 > [!WARNING]
-> **Active development — not production-ready.** The feature code is present, but a fresh clone is not yet runnable: the dependency manifest and configuration are empty, the MediaPipe model path is machine-specific, and database initialization is not wired into startup. Runtime behavior is unverified. Track stabilization in [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
+> **Active development — not production-ready.** Runtime bootstrap (pinned dependencies, configuration, portable model paths, and lifespan-managed services) is implemented and was verified on macOS arm64 with Python 3.11. Database initialization, authentication, input validation, and the automated test/CI baseline are still open. Track stabilization in [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
 ## What it does
 
@@ -21,7 +21,7 @@ Attendance.Application is a camera-based attendance verification backend built w
 The intended flow is narrow: establish presence, match identity, and write one attendance record. There is no web UI; the current client is a manual Python/OpenCV script.
 
 - **Presence** — a face must produce a blink while basic image-quality screening passes. Both checks are heuristic, not certified presentation-attack detection.
-- **Identity** — an InsightFace `buffalo_l` embedding is compared with the registered student embedding using cosine similarity at a `0.40` threshold.
+- **Identity** — an InsightFace `buffalo_l` embedding is compared with the registered student embedding using cosine similarity at a configurable threshold (default `0.40`).
 - **Record** — a match is inserted into SQLite with a `UNIQUE (student_id, lecture_id, attendance_date)` constraint. Attendance can be queried by student or across all records.
 
 ## How verification works
@@ -32,7 +32,7 @@ The intended flow is narrow: establish presence, match identity, and write one a
 
 1. **Start a session** — `POST /liveness/start` creates an in-memory UUID session.
 2. **Prove liveness** — `POST /liveness/frame` checks for a face, a blink, and basic frame quality. A blink plus the screening must pass for liveness to be verified.
-3. **Match identity** — `POST /attendance/verify` requires a liveness-verified session no older than 30 seconds, extracts an InsightFace embedding, and compares it with the registered student embedding.
+3. **Match identity** — `POST /attendance/verify` requires a liveness-verified session no older than `LIVENESS_VALIDITY_SECONDS` (default 30 seconds), extracts an InsightFace embedding, and compares it with the registered student embedding.
 4. **Write one record** — a match inserts into SQLite; a duplicate is rejected by the unique constraint. Success and face rejection both consume the session.
 
 Liveness sessions are process-local: they disappear on restart and are not shared between workers. The full response and failure behavior is documented in [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
@@ -55,36 +55,37 @@ There is no authentication today. Application-level errors usually return HTTP `
 | Layer | Tools |
 | --- | --- |
 | API | FastAPI, Uvicorn, `python-multipart` |
+| Configuration | `pydantic-settings`, `.env` |
 | Vision | OpenCV, MediaPipe, InsightFace, ONNX Runtime |
 | Numerics | NumPy |
 | Persistence | SQLite (Python standard library) |
 | Manual client | OpenCV webcam capture, `requests` |
 
-Dependency versions are not declared yet; runtime bootstrap is tracked in [#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2).
+Direct dependencies are pinned in [`requirements.txt`](requirements.txt); the verified platform is Python 3.11.16 on macOS arm64. See [Setup](docs/SETUP.md) for model provisioning and startup commands.
 
 ## Status
 
-The source contains these pieces, but end-to-end runtime behavior is unverified.
+Runtime bootstrap and service wiring were verified locally; the camera-based flows and the security baseline are not.
 
-| Present in source | Not yet verified or missing |
+| Verified locally | Still missing or unverified |
 | --- | --- |
-| Blink-based liveness, EAR state machine, heuristic frame screening | Fresh-clone startup ([#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2)) |
-| InsightFace embeddings and `0.40` cosine matching | Runtime behavior of every endpoint |
-| SQLite schema, inserts, duplicate constraint, queries | Database initialization at startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)) |
-| Manual registration, camera, and API scripts | Auth ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)), retention/deletion ([#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9)), automated tests/CI ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)) |
+| Pinned dependencies, validated settings, `.env` support | End-to-end liveness → face match → attendance flow |
+| Startup, `GET /`, `GET /docs` | Database initialization at startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)) |
+| One MediaPipe and one InsightFace load per process | Auth ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)), input hardening ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)) |
+| Missing-model startup failure | Retention/deletion ([#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9)), automated tests/CI ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)) |
 
 No benchmarked face-recognition accuracy, liveness performance, or presentation-attack resistance results exist. Stabilization work is sequenced in the [tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
 ## Setup status
 
-**There is no verified install or startup command yet.** A fresh clone is blocked by:
+Install and startup are verified on **Python 3.11.16 / macOS arm64** with the pinned manifest. Model assets are not committed and must be provisioned locally:
 
-- Empty `requirements.txt` and `app/core/config.py`.
-- A hardcoded Windows MediaPipe model path in `app/services/liveness.py`.
-- `initialize_database()` not being called during application startup.
-- Model assets and registered embeddings that are not included in the repository.
+- MediaPipe `face_landmarker.task` must be downloaded or supplied via `MEDIAPIPE_FACE_LANDMARKER_MODEL`.
+- InsightFace `buffalo_l` is downloaded on first startup or provisioned in `INSIGHTFACE_ROOT`.
+- Registered embeddings are required for face matching and must never be committed.
+- `initialize_database()` is still not called at startup, so a fresh database has no `attendance` table ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
 
-Start with [docs/SETUP.md](docs/SETUP.md), then the [stabilization backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13). The first runtime blockers are [#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2) and [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3). Manual script requirements are in [docs/TESTING.md](docs/TESTING.md).
+Follow [docs/SETUP.md](docs/SETUP.md) for commands and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for environment variables. The next stabilization blockers are [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3) and [#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5). Manual script requirements are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Repository map
 
@@ -97,10 +98,11 @@ Attendance.Application/
 │   └── main.py           # FastAPI entry point
 ├── assets/readme/        # README visuals (static SVG)
 ├── docs/                 # setup, architecture, API, security, status
+├── tests/runtime/        # focused settings, startup, and path tests
 ├── tests/services/       # manual camera/model scripts
 ├── test_api_attendance.py
 ├── test_liveness_service.py
-├── requirements.txt      # currently empty
+├── requirements.txt      # pinned runtime dependencies
 └── README.md
 ```
 
@@ -111,7 +113,7 @@ Attendance.Application/
 
 - The API has no authentication or authorization. Liveness session IDs behave like short-lived bearer tokens and should not be logged.
 - Anti-spoofing is heuristic blink and image-quality screening, not a trained or certified presentation-attack detection system.
-- Liveness sessions live in process memory, are single-worker only, and expire 30 seconds after successful liveness verification.
+- Liveness sessions live in process memory, are single-worker only, and expire after `LIVENESS_VALIDITY_SECONDS` (default 30 seconds).
 - There is no biometric retention, deletion, or storage-protection policy yet; this is tracked in [#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9).
 - Face images, embeddings, model files, and local databases are excluded from Git. Never force-add them.
 

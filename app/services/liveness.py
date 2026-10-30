@@ -2,40 +2,61 @@ import cv2
 import mediapipe as mp
 import math
 
+from pathlib import Path
+
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
+from app.core.config import get_settings
 from app.services.anti_spoofing import AntiSpoofingService
 
 
 class LivenessService:
 
-    MODEL_PATH = (
-        r"C:\AI-Attendance-System\ai-service"
-        r"\models\mediapipe\face_landmarker.task"
-    )
-
     CLOSED_THRESHOLD = 0.10
     REQUIRED_CLOSED_FRAMES = 4
 
-    def __init__(self):
+    def __init__(self, model_path=None):
+
+        if model_path is None:
+            model_path = get_settings().mediapipe_face_landmarker_model
+
+        self.model_path = Path(model_path).expanduser()
+
+        if not self.model_path.is_file():
+
+            raise RuntimeError(
+                "MediaPipe Face Landmarker model not found. "
+                "Set MEDIAPIPE_FACE_LANDMARKER_MODEL to the path "
+                "of a valid face_landmarker.task file."
+            )
 
         print("Loading MediaPipe Face Landmarker...")
 
-        base_options = python.BaseOptions(
-            model_asset_path=self.MODEL_PATH
-        )
+        try:
 
-        options = vision.FaceLandmarkerOptions(
-            base_options=base_options,
-            num_faces=1
-        )
-
-        self.detector = (
-            vision.FaceLandmarker.create_from_options(
-                options
+            base_options = python.BaseOptions(
+                model_asset_path=str(self.model_path)
             )
-        )
+
+            options = vision.FaceLandmarkerOptions(
+                base_options=base_options,
+                num_faces=1
+            )
+
+            self.detector = (
+                vision.FaceLandmarker.create_from_options(
+                    options
+                )
+            )
+
+        except Exception as error:
+
+            raise RuntimeError(
+                "Failed to initialize MediaPipe from "
+                "MEDIAPIPE_FACE_LANDMARKER_MODEL. "
+                f"{type(error).__name__}: {error}"
+            ) from error
 
         # -------------------------------------------------
         # ANTI-SPOOFING SERVICE
@@ -45,6 +66,18 @@ class LivenessService:
 
         print("MediaPipe Face Landmarker loaded")
         print("Liveness Service ready")
+
+    # =====================================================
+    # RELEASE NATIVE RESOURCES
+    # =====================================================
+
+    def close(self):
+
+        detector = getattr(self, "detector", None)
+
+        if detector is not None:
+            detector.close()
+            self.detector = None
 
     # =====================================================
     # DISTANCE
