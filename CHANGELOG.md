@@ -12,22 +12,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Root agent instructions (`AGENTS.md`) and contribution guidance (`CONTRIBUTING.md`).
 - Security policy (`SECURITY.md`).
 - GitHub pull-request and issue templates.
+- Validated configuration in `app/core/config.py` backed by environment variables and a project-root `.env` file.
+- `.env.example` with placeholders for model, embedding, database, CORS, recognition, and liveness settings.
+- Pinned runtime dependencies in `requirements.txt` and development dependencies in `requirements-dev.txt`.
+- Focused runtime tests under `tests/runtime/` for settings, lifespan wiring, `/`, `/docs`, missing-model failure, and database-path creation.
+- FastAPI lifespan-managed service construction with a shared `LivenessService` and `FaceRecognitionService`.
 
 ### Changed
 
 - Replaced the initial README with a documentation-oriented project overview that distinguishes implemented, unverified, and planned behavior.
 - Extended `.gitignore` hygiene for Python caches, build artifacts, editor files, and model binaries.
+- Replaced the hardcoded Windows MediaPipe path with `MEDIAPIPE_FACE_LANDMARKER_MODEL`.
+- Replaced import-time service construction and duplicate model loading with a single lifespan startup path.
+- Made the embedding directory, SQLite path, CORS origins, face threshold, liveness validity, and InsightFace cache configurable.
+- `get_connection()` now honors `ATTENDANCE_DB_PATH` while still leaving schema initialization to issue #3.
+- Updated setup, configuration, architecture, database, testing, roadmap, status, known-issue, and decision documentation with verified runtime behavior.
 
 ### Repository
 
 - `main` now contains the integrated attendance-verification and AI-security feature work. The original feature branches were fully merged before remote cleanup on 2026-10-27.
-- No application source code, dependency manifest, configuration, database logic, or runtime behavior was changed as part of this documentation foundation.
+- Runtime bootstrap was developed on `fix/runtime-bootstrap` and verified locally on macOS 27.0.1 arm64 with Python 3.11.16.
 
 ### Known gaps
 
-- Dependency manifest and configuration module are empty.
-- MediaPipe model path is hardcoded to a Windows path.
-- Database initialization is not called during application startup.
-- No automated test suite or CI workflow exists.
-- No authentication or authorization is implemented.
+- Database initialization is still not called during application startup (issue #3).
+- No full automated test suite or CI workflow exists (issue #7).
+- No authentication or authorization is implemented (issue #4).
+- Input validation, upload limits, and error sanitization are still missing (issue #5).
 - Anti-spoofing is heuristic screening, not a trained PAD model.
+- Startup is verified only on macOS arm64 with Python 3.11.16.

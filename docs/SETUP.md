@@ -1,81 +1,94 @@
 # Setup
 
-## Current status: blocked and unverified
+## Current status
 
-The repository cannot yet be set up reproducibly from a fresh clone. Do not present the commands below as a verified installation until the blockers are resolved and this document is updated.
+Runtime bootstrap is implemented and was verified on one documented platform:
 
-Confirmed blockers:
+| Item | Verified value |
+| --- | --- |
+| Platform | macOS 27.0.1, arm64 |
+| Python | 3.11.16 |
+| Dependency install | Clean virtual environment + `python -m pip install -r requirements.txt` |
+| Startup | `python -m uvicorn app.main:app` reached "Application startup complete" |
+| Endpoints | `GET /` returned `200`; `GET /docs` returned `200` |
+| Missing model | Startup failed with a `RuntimeError` naming `MEDIAPIPE_FACE_LANDMARKER_MODEL` |
+| Model services | MediaPipe and InsightFace each initialized once during startup |
 
-- `requirements.txt` is empty.
-- `app/core/config.py` is empty.
-- The MediaPipe model path is hardcoded to a Windows path in `app/services/liveness.py`.
-- `initialize_database()` is not called during startup.
-- No model files, registered embeddings, fixtures, or test database are tracked.
+This does **not** mean the whole application is verified. Database schema
+initialization, authentication, input validation, tests/CI, and the end-to-end
+camera flow remain open. See the
+[tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
-See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for evidence and proposed fixes.
+## Supported Python version
 
-## Python compatibility
+**Python 3.11** is the documented and tested version. The current dependency
+set was installed and started successfully with Python 3.11.16 on macOS arm64.
+Other Python versions and platforms have not been verified.
 
-The supported Python version is **not verified**. The code does not use especially new syntax, but the native AI dependencies are sensitive to Python and platform versions. Choose a Python version supported by all selected dependencies and record the tested version here once verified.
-
-Do not claim Python compatibility based on syntax checks alone.
+Native AI dependencies are sensitive to Python and platform versions. Do not
+claim support for another combination without running the commands below.
 
 ## Dependencies
 
-`requirements.txt` is intentionally not populated as part of the documentation foundation. The imports in the current code imply these runtime packages:
+Runtime dependencies are pinned in [`requirements.txt`](../requirements.txt).
+Development dependencies are in [`requirements-dev.txt`](../requirements-dev.txt).
 
-- `fastapi`
-- `uvicorn`
-- `python-multipart`
-- `opencv-python` (imported as `cv2`)
-- `numpy`
-- `mediapipe`
-- `insightface`
-- `onnxruntime`
-- `requests` for the manual API client
+`mediapipe` and `insightface` both declare OpenCV packages. Both
+`opencv-python` and `opencv-contrib-python` are pinned to the same version so
+the shared `cv2` namespace stays consistent.
 
-This list is inferred from imports, not from a verified manifest. Versions, exact package variants, and platform-specific constraints are not declared.
+## Installation
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+# For pytest-based runtime checks:
+python -m pip install -r requirements-dev.txt
+```
+
+Create local configuration only if you need to override defaults:
+
+```bash
+cp .env.example .env
+```
+
+`.env` is ignored by Git. Never put real credentials or student data in it.
 
 ## Model and data assets
 
-| Asset | Expected by code | Current status |
+These assets are required at runtime but are deliberately excluded from Git.
+
+| Asset | How to provision it | Default location |
 | --- | --- | --- |
-| MediaPipe Face Landmarker model | `face_landmarker.task`; currently hardcoded at `C:\AI-Attendance-System\ai-service\models\mediapipe\face_landmarker.task` | Not present; non-Windows startup is blocked. |
-| InsightFace `buffalo_l` | `FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])` | Provisioning/caching is external to this repository and unverified. |
-| Registered embedding | `data/face_embeddings/<student_id>.npy` | Not present; must be generated with a registration workflow. |
-| Attendance database | `data/attendance.db` | Directory/database created on first connection; table is not created because initialization is not called. |
-| Test fixtures | `tests/fixtures/test.jpg`, `closed_eye.jpeg` | Referenced by scripts but ignored by Git and absent. |
+| MediaPipe Face Landmarker | Download `face_landmarker.task` from the MediaPipe model storage URL below. | `models/mediapipe/face_landmarker.task` |
+| InsightFace `buffalo_l` | InsightFace downloads it on first startup, or pre-provision it in the InsightFace cache. | `~/.insightface/models/buffalo_l` |
+| Registered embedding | Generate with the registration workflow using synthetic or consented data. Never commit it. | `data/face_embeddings/<student_id>.npy` |
+| Attendance database | Created on first connection; the schema startup hook is still tracked in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3). | `data/attendance.db` |
 
-Do not commit real face images, embeddings, or databases.
-
-## Intended setup workflow (not verified)
-
-The following is the intended workflow after the Phase 1 runtime fixes. It is **not** currently guaranteed to work.
+MediaPipe model download:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt    # currently installs nothing
-# Place the MediaPipe model where the configured path expects it.
-# Provide or register a face embedding for the test student.
-uvicorn app.main:app --reload
+mkdir -p models/mediapipe
+curl -fL -o models/mediapipe/face_landmarker.task \
+  https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
 ```
 
-The README and this document must be updated with the exact tested Python version, package versions, model paths, and commands once the workflow succeeds.
+InsightFace downloads `buffalo_l` into the configured `INSIGHTFACE_ROOT`
+(default `~/.insightface`) when it is first used. The download requires network
+access and is roughly 275 MB. Review model licensing and redistribution terms
+before shipping any model asset; do not commit model files.
 
-## Startup behavior
+Set `MEDIAPIPE_FACE_LANDMARKER_MODEL`, `INSIGHTFACE_ROOT`, and
+`FACE_EMBEDDING_DIR` in `.env` if you keep assets elsewhere.
 
-Importing `app.main` imports both routers. Both routers construct services at import time:
-
-- `app/api/routes.py` creates `AttendanceVerificationService`, which creates `LivenessService` and `FaceRecognitionService`.
-- `app/api/liveness_routes.py` creates another `LivenessService`.
-
-Therefore, the application requires the MediaPipe and InsightFace models **before** it can import. A missing model raises during import, not on the first request.
-
-Recommended verification once assets exist:
+## Start the API
 
 ```bash
-uvicorn app.main:app --reload
+source .venv/bin/activate
+python -m uvicorn app.main:app --reload
 ```
 
 Then open:
@@ -83,11 +96,24 @@ Then open:
 - `http://127.0.0.1:8000/` — service message
 - `http://127.0.0.1:8000/docs` — OpenAPI UI
 
-Do not report startup as successful until these requests have been executed and recorded.
+Startup loads the models once. If the MediaPipe model is missing, the process
+exits with an error naming `MEDIAPIPE_FACE_LANDMARKER_MODEL`; `/` and `/docs`
+will not be available.
+
+## Configuration
+
+All supported environment variables, defaults, path resolution, and startup
+behavior are documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Database initialization
 
-A fresh checkout has no `data/attendance.db` and no `attendance` table. The helper `initialize_database()` is not invoked by the app, the routes, or any test. Until Phase 1 fixes this, attendance inserts and queries can fail with `no such table: attendance`.
+`get_connection()` honors the configured `ATTENDANCE_DB_PATH` and creates its
+parent directory. **The `attendance` table is still not created at startup**
+because `initialize_database()` is not called. This remains a runtime blocker
+tracked in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3).
+
+Until that issue is fixed, attendance inserts and queries can fail with
+`no such table: attendance` on a fresh database.
 
 ## Manual client
 
@@ -99,26 +125,42 @@ A fresh checkout has no `data/attendance.db` and no `attendance` table. The help
 - a registered embedding for `STU001`;
 - a liveness flow completed by a person.
 
-It uses hardcoded values for `STUDENT_ID`, `SUBJECT`, and `LECTURE_ID`; review before running.
+It uses hardcoded values for `STUDENT_ID`, `SUBJECT`, and `LECTURE_ID`; review
+before running. Parameterizing these scripts is tracked in
+[#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10).
+
+## Verification commands
+
+```bash
+# Syntax check
+python -m compileall -q app tests
+
+# Focused runtime tests (no models or camera required)
+python -m pytest tests/runtime -q
+
+# Full startup check (requires model assets)
+python -m uvicorn app.main:app
+```
+
+See [TESTING.md](TESTING.md) for what is and is not covered.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Next step |
 | --- | --- | --- |
-| `pip install -r requirements.txt` installs no application packages | Manifest is empty | Wait for Phase 1 dependency work; do not guess versions as verified. |
-| Import error mentioning `face_landmarker.task` or a `C:\...` path | Hardcoded Windows model path | Documented blocker; requires a code/config fix. |
-| InsightFace model load/download error | `buffalo_l` assets unavailable or cache incomplete | Provision the model through InsightFace's supported mechanism; verify before documenting. |
-| `Registered face not found for student: ...` | Missing `data/face_embeddings/<student_id>.npy` | Generate a consented test embedding; do not use real student data. |
-| `no such table: attendance` | Database schema not initialized | Confirmed blocker; requires startup initialization. |
+| `ModuleNotFoundError` during startup | Dependencies not installed in the active environment | Activate `.venv` and install `requirements.txt`. |
+| Startup fails with `MediaPipe Face Landmarker model not found` | Model path is missing or wrong | Download the model and set `MEDIAPIPE_FACE_LANDMARKER_MODEL`. |
+| Startup fails while initializing InsightFace | `buffalo_l` is unavailable, the cache is not writable, or the download failed | Check `INSIGHTFACE_ROOT`, network access, and model licensing. |
+| `Registered face not found for student: ...` | Missing `FACE_EMBEDDING_DIR/<student_id>.npy` | Generate a consented test embedding; do not use real student data. |
+| `no such table: attendance` | Database schema is not initialized | Tracked in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3). |
 | Camera cannot be opened | No camera, permission denied, or device in use | Check OS camera permissions and device access. |
 | Port already in use | Another server on port 8000 | Stop it or run Uvicorn on another port. |
 
-## What to verify before marking setup complete
+## What is still unverified
 
-1. Fresh clone + documented commands install dependencies successfully.
-2. The application starts without Windows-specific paths.
-3. A fresh database gets its schema automatically.
-4. `/` and `/docs` respond.
-5. A consented test face can complete liveness and attendance verification.
-6. Duplicate attendance is rejected as documented.
-7. README, SETUP, and CONFIGURATION reflect the verified values.
+- Startup on Windows or Linux, or with any Python version other than 3.11.16.
+- Automatic creation of the `attendance` table.
+- A complete liveness + face-match + attendance flow with a camera.
+- Duplicate attendance behavior on a fresh database.
+- Recognition accuracy, liveness accuracy, and presentation-attack resistance.
+- Automated API/database coverage and CI.

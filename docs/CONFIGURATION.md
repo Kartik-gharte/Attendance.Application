@@ -2,55 +2,78 @@
 
 ## Current state
 
-There is no configuration system. `app/core/config.py` is empty, and the application does not read environment variables. The `.env` pattern is ignored by Git but no code loads `.env` files.
+Configuration is implemented in `app/core/config.py` as a validated
+`pydantic-settings` object. Settings are read from environment variables and
+from an optional `.env` file at the repository root. The `.env` file is ignored
+by Git; [`.env.example`](../.env.example) contains placeholders only.
 
-All current settings are hardcoded in source files. The tables below record them so future configuration work starts from the actual state.
+Settings are loaded when `app.main` is imported. Model services are created
+later, once per process, in the FastAPI lifespan.
 
-## Application and server
+Relative paths are resolved against the repository root, not the current
+working directory. `~` is expanded and paths are normalized with
+`Path.resolve()`.
 
-| Setting | Value | Location | Notes |
+## Environment variables
+
+| Variable | Default | Purpose | Validation |
 | --- | --- | --- | --- |
-| FastAPI title | `AI Attendance System` | `app/main.py:9` | OpenAPI metadata. |
-| FastAPI version | `1.0.0` | `app/main.py:10` | Not a release tag. |
-| CORS origins | `http://127.0.0.1:5500`, `http://localhost:5500`, `http://127.0.0.1:5173`, `http://localhost:5173` | `app/main.py:21-26` | Local development origins only. |
-| CORS credentials | `True` | `app/main.py:28` | All methods and headers allowed. |
-| Liveness validity | `30` seconds | `app/api/liveness_routes.py:22` | Applied after successful liveness verification. |
-| Server host/port | Not configured in code | — | Supplied to Uvicorn at launch. |
+| `MEDIAPIPE_FACE_LANDMARKER_MODEL` | `models/mediapipe/face_landmarker.task` | MediaPipe Face Landmarker `.task` file. | Must exist when the service starts. |
+| `FACE_EMBEDDING_DIR` | `data/face_embeddings` | Directory containing `<student_id>.npy` embeddings. | Path. |
+| `ATTENDANCE_DB_PATH` | `data/attendance.db` | SQLite database file. | Path. Schema startup initialization is still tracked in [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3). |
+| `CORS_ALLOWED_ORIGINS` | Local ports `5500` and `5173` on `127.0.0.1` and `localhost` | Comma-separated CORS origins. | Empty entries are ignored. |
+| `FACE_MATCH_THRESHOLD` | `0.40` | Cosine-similarity threshold for a face `MATCH`. | `0.0`–`1.0`. |
+| `LIVENESS_VALIDITY_SECONDS` | `30` | Window in which a verified liveness session can be used. | Positive integer. |
+| `INSIGHTFACE_MODEL_NAME` | `buffalo_l` | InsightFace model pack name. | Non-empty string. |
+| `INSIGHTFACE_ROOT` | `~/.insightface` | InsightFace model cache/download directory. | Path. |
 
-## Liveness and anti-spoofing
+Copy [`.env.example`](../.env.example) to `.env` to override defaults locally.
+Do not commit `.env` or real credentials.
 
-| Setting | Value | Location | Notes |
-| --- | --- | --- | --- |
-| MediaPipe model path | `C:\AI-Attendance-System\ai-service\models\mediapipe\face_landmarker.task` | `app/services/liveness.py:13-16` | Windows-only; non-portable. |
-| MediaPipe face count | `1` | `app/services/liveness.py:31` | At most one face is processed. |
-| Eye-closed EAR threshold | `0.10` | `app/services/liveness.py:18` | EAR below this counts as closed. |
-| Required closed frames | `4` | `app/services/liveness.py:19` | Consecutive frames before a blink can be detected. |
-| Minimum face size | `80` pixels per side | `app/services/anti_spoofing.py:20` | Bounding box check. |
-| Minimum brightness | `35` | `app/services/anti_spoofing.py:21` | Mean grayscale value. |
-| Maximum brightness | `235` | `app/services/anti_spoofing.py:22` | Mean grayscale value. |
-| Minimum sharpness | Laplacian variance `< 10` rejected | `app/services/anti_spoofing.py:164` | Basic blur screening. |
-| Low-detail penalty | Laplacian variance `< 25` | `app/services/anti_spoofing.py:179` | Reduces score by `0.10`. |
-| Lighting penalty | Brightness `< 50` or `> 220` | `app/services/anti_spoofing.py:184-190` | Reduces score by `0.10`. |
+## Startup behavior
 
-These are heuristic thresholds, not calibrated values or a trained model.
+`create_app()` in `app/main.py` builds the FastAPI application and registers a
+lifespan handler. The lifespan:
 
-## Face recognition
+1. Stores the settings object on `app.state.settings`.
+2. Calls `build_services(settings)` once.
+3. Creates one `LivenessService`, one `FaceRecognitionService`, and one
+   `AttendanceVerificationService` that shares those instances.
+4. Stores the services on `app.state`.
+5. Closes the MediaPipe detector on shutdown.
 
-| Setting | Value | Location | Notes |
-| --- | --- | --- | --- |
-| InsightFace model | `buffalo_l` | `app/services/face_recognition.py:13-16` | Loaded with `CPUExecutionProvider`. |
-| Detection size | `640x640` initially; `1024x1024` on later attempts | `app/services/face_recognition.py` | Multi-attempt detection. |
-| Detection threshold override | `0.35` | `app/services/face_recognition.py:26` | Applied inside a `try/except`; may be ignored. |
-| Upscale factor | `2x` | `app/services/face_recognition.py:218` | Applied for retry attempts. |
-| Similarity threshold | `0.40` | `app/services/face_recognition.py:31` | Cosine similarity at or above this is `MATCH`. |
+If the MediaPipe model file does not exist, startup fails with:
 
-## Storage paths
+```text
+RuntimeError: MediaPipe Face Landmarker model not found. Set
+MEDIAPIPE_FACE_LANDMARKER_MODEL to the path of a valid
+face_landmarker.task file.
+```
 
-| Setting | Value | Location | Notes |
-| --- | --- | --- | --- |
-| Database path | `<repo>/data/attendance.db` | `app/database/attendance_db.py:10-14` | Directory created on first connection. |
-| Embedding path | `<repo>/data/face_embeddings/<student_id>.npy` | `app/services/face_recognition.py:464-475` | `student_id` is interpolated into the path without validation. |
-| Model directory | `models/mediapipe/` (intended by other scripts) | `tests/services/test_landmarks.py`, `test_face.py` | The app itself uses the hardcoded Windows path. |
+InsightFace initialization failures are wrapped with a message naming
+`INSIGHTFACE_MODEL_NAME` and `INSIGHTFACE_ROOT`.
+
+`GET /` and `/docs` are served only after the lifespan completes, so they are
+not available when model initialization fails.
+
+## Settings still hardcoded
+
+The following values are not configurable yet:
+
+| Setting | Value | Location |
+| --- | --- | --- |
+| MediaPipe face count | `1` | `app/services/liveness.py` |
+| Eye-closed EAR threshold | `0.10` | `app/services/liveness.py` |
+| Required closed frames | `4` | `app/services/liveness.py` |
+| InsightFace execution provider | `CPUExecutionProvider` | `app/services/face_recognition.py` |
+| Detection size | `640x640`, then `1024x1024` on retries | `app/services/face_recognition.py` |
+| InsightFace detection threshold override | `0.35` | `app/services/face_recognition.py` |
+| Upscale factor | `2x` | `app/services/face_recognition.py` |
+| Minimum face size | `80` pixels per side | `app/services/anti_spoofing.py` |
+| Brightness bounds | `35`–`235` | `app/services/anti_spoofing.py` |
+| Sharpness heuristics | Laplacian variance `< 10` rejected, `< 25` penalized | `app/services/anti_spoofing.py` |
+
+These are heuristic values, not calibrated or certified security thresholds.
 
 ## Manual client configuration
 
@@ -60,25 +83,18 @@ These are heuristic thresholds, not calibrated values or a trained model.
 | Student ID | `STU001` | `test_api_attendance.py`, registration scripts |
 | Subject | `Java Programming` | `test_api_attendance.py` |
 | Lecture ID | `JAVA-LECTURE-API-001` | `test_api_attendance.py` |
-| Registration output | `../../data/face_embeddings/STU001.npy` | `app/services/register_face.py:64-70` |
+| Registration output | `../../data/face_embeddings/STU001.npy` | `app/services/register_face.py` |
 
-The registration path is relative to the current working directory and can write outside the repository. Fix this during Phase 1/2.
+The manual client and registration scripts still use hardcoded values and
+relative output paths. Parameterizing them is tracked in
+[#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10).
 
-## Environment variables
+## Not implemented
 
-No environment variables are currently read. `.env` and `.env.*` are ignored, but there is no loader. Do not assume `.env` changes application behavior.
+- Database schema initialization during startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
+- Input validation and upload limits ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
+- Authentication and authorization ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)).
+- Structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).
+- A configurable log level.
 
-## Proposed configuration (not implemented)
-
-The following are recommendations, not current behavior:
-
-| Proposed variable | Purpose | Safe example |
-| --- | --- | --- |
-| `ATTENDANCE_DB_PATH` | Override the SQLite path for development/tests | `/tmp/attendance-test.db` |
-| `MEDIAPIPE_FACE_LANDMARKER_MODEL` | Portable model path | `./models/mediapipe/face_landmarker.task` |
-| `FACE_MATCH_THRESHOLD` | Tune similarity threshold after evaluation | `0.40` |
-| `LIVENESS_VALIDITY_SECONDS` | Session validity window | `30` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated development origins | `http://localhost:5173` |
-| `LOG_LEVEL` | Structured logging verbosity | `INFO` |
-
-Any configuration work must be a focused, reviewed change with tests and updated documentation. Do not add secrets to source control or documentation.
+Do not add secrets to source control or documentation.

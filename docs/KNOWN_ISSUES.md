@@ -1,49 +1,51 @@
 # Known Issues
 
-These are confirmed gaps based on source inspection and repository state as of 2026-10-27. None were fixed during the documentation foundation task.
+These are confirmed gaps based on source inspection and repository state as of 2026-10-30. KI-001, KI-002, KI-009, and KI-013 were resolved by the runtime-bootstrap change; the remaining issues are still open.
 
 Severity is a triage aid, not a formal risk rating.
 
 ## Summary
 
-| ID | Severity | Issue |
-| --- | --- | --- |
-| KI-001 | Critical | Empty dependency manifest |
-| KI-002 | Critical | Hardcoded Windows model path |
-| KI-003 | Critical | Database schema is never initialized |
-| KI-004 | Critical | No authentication or authorization |
-| KI-005 | High | `student_id` is used in a filesystem path without validation |
-| KI-006 | High | Liveness sessions are bearer-like and replayable |
-| KI-007 | High | No upload size/type limits or domain validation |
-| KI-008 | High | No automated test suite |
-| KI-009 | High | No configuration system |
-| KI-010 | High | Error responses expose internal messages |
-| KI-011 | High | No retention, deletion, encryption, or backup policy |
-| KI-012 | Medium | In-memory sessions are per-process and never cleaned up |
-| KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile |
-| KI-014 | Medium | Broken import in `test_liveness_service.py` |
-| KI-015 | Medium | Missing fixtures and model assets |
-| KI-016 | Medium | Registration and client paths/IDs are hardcoded |
-| KI-017 | Medium | Logs contain personal data and use `print()` |
-| KI-018 | Medium | No CI or verified branch protection |
-| KI-019 | Low | Dead/duplicate code paths and scripts |
-| KI-020 | High | Anti-spoofing effectiveness is unmeasured |
+| ID | Severity | Issue | Status |
+| --- | --- | --- | --- |
+| KI-001 | Critical | Empty dependency manifest | Resolved |
+| KI-002 | Critical | Hardcoded Windows model path | Resolved |
+| KI-003 | Critical | Database schema is never initialized | Open |
+| KI-004 | Critical | No authentication or authorization | Open |
+| KI-005 | High | `student_id` is used in a filesystem path without validation | Open |
+| KI-006 | High | Liveness sessions are bearer-like and replayable | Open |
+| KI-007 | High | No upload size/type limits or domain validation | Open |
+| KI-008 | High | No automated test suite | Open |
+| KI-009 | High | No configuration system | Resolved |
+| KI-010 | High | Error responses expose internal messages | Open |
+| KI-011 | High | No retention, deletion, encryption, or backup policy | Open |
+| KI-012 | Medium | In-memory sessions are per-process and never cleaned up | Open |
+| KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile | Resolved |
+| KI-014 | Medium | Broken import in `test_liveness_service.py` | Open |
+| KI-015 | Medium | Missing fixtures and model assets | Open |
+| KI-016 | Medium | Registration and client paths/IDs are hardcoded | Open |
+| KI-017 | Medium | Logs contain personal data and use `print()` | Open |
+| KI-018 | Medium | No CI or verified branch protection | Open |
+| KI-019 | Low | Dead/duplicate code paths and scripts | Open |
+| KI-020 | High | Anti-spoofing effectiveness is unmeasured | Open |
 
 ## Details
 
 ### KI-001 — Empty dependency manifest
 
-- **Evidence:** `requirements.txt` is 0 bytes.
-- **Impact:** A fresh clone cannot install the application. Setup instructions cannot be verified.
+- **Evidence:** `requirements.txt` was 0 bytes.
+- **Impact:** A fresh clone could not install the application. Setup instructions could not be verified.
 - **Proposed fix:** Define a reviewed, pinned manifest compatible with a documented Python version; test installation in a clean environment.
-- **Status:** Open; Phase 1 blocker.
+- **Resolution:** `requirements.txt` and `requirements-dev.txt` are pinned. A clean Python 3.11.16 virtual environment installed successfully from the manifest on 2026-10-30.
+- **Status:** Resolved 2026-10-30.
 
 ### KI-002 — Hardcoded Windows model path
 
-- **Evidence:** `app/services/liveness.py:13-16` sets an absolute `C:\...` path.
-- **Impact:** Import fails on macOS/Linux and on any machine without that exact Windows layout.
+- **Evidence:** `app/services/liveness.py` previously set an absolute `C:\...` path.
+- **Impact:** Import failed on macOS/Linux and on any machine without that exact Windows layout.
 - **Proposed fix:** Read a portable path from configuration, validate existence, and document model provisioning.
-- **Status:** Open; Phase 1 blocker.
+- **Resolution:** The path is read from `MEDIAPIPE_FACE_LANDMARKER_MODEL` (default `models/mediapipe/face_landmarker.task`). Missing files fail startup with an actionable error. Startup was verified on macOS arm64.
+- **Status:** Resolved 2026-10-30.
 
 ### KI-003 — Database schema is never initialized
 
@@ -69,7 +71,7 @@ Severity is a triage aid, not a formal risk rating.
 ### KI-006 — Liveness sessions are replayable and exposed in query strings
 
 - **Evidence:** `session_id` is a UUID stored in a module-level dictionary; `/liveness/frame` accepts it as a query parameter; `/attendance/verify` trusts that a verified session exists. Sessions are not bound to a student or client.
-- **Impact:** A captured session or final image can be replayed within the 30-second window. Session IDs may appear in logs.
+- **Impact:** A captured session or final image can be replayed within the configured validity window (default 30 seconds). Session IDs may appear in logs.
 - **Proposed fix:** Bind sessions to an authenticated user/student and device context, use headers/body instead of query strings, and add one-time, cryptographic challenge binding.
 - **Status:** Open.
 
@@ -89,10 +91,11 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-009 — No configuration system
 
-- **Evidence:** `app/core/config.py` is empty; no `os.environ`, `getenv`, or dotenv usage exists.
-- **Impact:** Paths, thresholds, origins, and storage locations cannot be changed without editing source. `.env` files are ignored but not loaded.
+- **Evidence:** `app/core/config.py` was empty; no environment or dotenv usage existed.
+- **Impact:** Paths, thresholds, origins, and storage locations could not be changed without editing source.
 - **Proposed fix:** Add validated configuration with safe defaults and documented environment variables; do not add secrets to the repository.
-- **Status:** Open; Phase 1.
+- **Resolution:** `app/core/config.py` defines a validated `Settings` object backed by environment variables and a project-root `.env` file. Defaults and overrides are documented in [CONFIGURATION.md](CONFIGURATION.md).
+- **Status:** Resolved 2026-10-30.
 
 ### KI-010 — Internal error messages returned to clients
 
@@ -117,10 +120,11 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-013 — Duplicate model loading at import
 
-- **Evidence:** `app/api/liveness_routes.py:12` creates one `LivenessService`; `app/services/attendance_verification.py:11` creates another inside `AttendanceVerificationService`; `app/api/routes.py:22` instantiates that service at import.
-- **Impact:** Two MediaPipe detectors and one InsightFace model load before serving; slow startup, higher memory use, and import-time failure.
+- **Evidence:** Routers previously constructed services at import; two `LivenessService` instances and one `FaceRecognitionService` loaded before serving.
+- **Impact:** Slow startup, higher memory use, and import-time failure.
 - **Proposed fix:** Create shared services once in a lifespan/application state and inject dependencies.
-- **Status:** Open.
+- **Resolution:** `build_services()` runs once in the FastAPI lifespan. Routes read the shared instances from `app.state`; startup logs confirmed one MediaPipe and one InsightFace load.
+- **Status:** Resolved 2026-10-30.
 
 ### KI-014 — Broken test import
 
@@ -131,8 +135,8 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-015 — Missing fixtures and model assets
 
-- **Evidence:** Scripts reference `tests/fixtures/test.jpg`, `closed_eye.jpeg`, `test.jpg`, `blaze_face_short_range.tflite`, and `face_landmarker.task`; none are present. Images/models are ignored by Git.
-- **Impact:** Manual tests cannot run from a clean checkout.
+- **Evidence:** Scripts reference `tests/fixtures/test.jpg`, `closed_eye.jpeg`, `test.jpg`, `blaze_face_short_range.tflite`, and `face_landmarker.task`; none are present in the repository. Images/models are ignored by Git. The MediaPipe application model and InsightFace cache now have documented provisioning in [SETUP.md](SETUP.md), but script fixtures are still absent.
+- **Impact:** Manual scripts cannot run from a clean checkout without additional fixtures.
 - **Proposed fix:** Document asset provisioning; use synthetic or consented fixtures; provide an opt-in local setup path without committing biometric data or large models.
 - **Status:** Open.
 
