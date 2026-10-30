@@ -1,0 +1,14 @@
+# Runtime dependencies verified on Python 3.11.16 (macOS arm64).
+# MediaPipe and InsightFace both declare OpenCV packages; pin both
+# to the same version to keep the shared cv2 namespace consistent.
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+numpy==2.4.6
+opencv-python==4.14.0.94
+opencv-contrib-python==4.14.0.94
+mediapipe==1.2.0
+insightface==2.1
+onnxruntime==1.31.1
+pydantic-settings==2.16.2
+requests==2.34.2
