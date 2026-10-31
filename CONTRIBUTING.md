@@ -13,12 +13,12 @@ Prefer multiple small, coherent contributions over one large change. Separate be
 
 ## Local prerequisites
 
-- Python and `pip`/`venv`. The exact supported Python version is not yet verified; see [docs/SETUP.md](docs/SETUP.md).
+- Python 3.11.16 on macOS arm64 is the verified environment; see [docs/SETUP.md](docs/SETUP.md).
 - A webcam for manual end-to-end tests.
 - MediaPipe Face Landmarker and InsightFace `buffalo_l` model assets for runtime tests.
 - SQLite (included with Python).
 
-Setup is currently blocked by known runtime gaps. Do not claim that a fresh clone is runnable until [docs/SETUP.md](docs/SETUP.md) is updated with a verified workflow.
+Install and startup are verified on the documented platform. The camera-based end-to-end flow still requires model assets, a registered embedding, and a provisioned account, and has not been verified end-to-end.
 
 ## Branch naming
 
