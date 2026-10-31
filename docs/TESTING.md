@@ -24,20 +24,56 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 
 The compile and test checks do not establish that the same Python version works on another platform, nor do they cover the camera-based flows.
 
-## Manual scripts
+## Manual scripts (opt‑in)
+
+The following scripts are **not** collected by `pytest` (they are outside `tests/runtime/`). They can be run manually from the repository root (e.g. `python -m manual.script` or `PYTHONPATH=. python script.py`). They require model assets and a webcam; they are not part of the automated test suite.
 
 | Script | What it does | Requirements | Current state |
 | --- | --- | --- | --- |
-| `test_api_attendance.py` | Authenticates, starts a liveness session, opens a webcam, sends frames, waits for a blink, then submits the final frame to `/attendance/verify`. | Running API, provisioned student account, webcam, `requests`, OpenCV, registered embedding for `STU001`. | Manual, no assertions; prompts for a password; hardcoded student/subject/lecture; reads `ATTENDANCE_API_URL` and `ATTENDANCE_USERNAME`. |
-| `test_liveness_service.py` | Older liveness camera script. | Webcam, MediaPipe model. | Broken import: `from liveness import LivenessService`; not runnable as-is. |
-| `tests/services/test_liveness_service.py` | Camera liveness test with anti-spoofing status display. | Webcam, MediaPipe model. | Manual; no assertions. |
-| `tests/services/test_attendance_verification.py` | Full camera liveness + face-recognition flow. | Webcam, MediaPipe + InsightFace models, embedding for `STU001`. | Manual; no assertions. |
-| `tests/services/test_embedding.py` | Extracts an InsightFace embedding from a fixture image. | `tests/fixtures/test.jpg`, InsightFace model. | Fixture absent; manual. |
-| `tests/services/test_face.py` | Legacy MediaPipe face-detector check. | `tests/fixtures/test.jpg`, `models/mediapipe/blaze_face_short_range.tflite`. | Fixture/model absent; uses a different model than the app. |
-| `tests/services/test_landmarks.py` | MediaPipe landmark and EAR check on a closed-eye image. | `tests/fixtures/closed_eye.jpeg`, `models/mediapipe/face_landmarker.task`. | Fixtures/model absent; manual. |
-| `tests/services/test_recognition.py` | Compares a fixture image with `data/face_embeddings/STU001.npy`. | Fixture image, InsightFace model, registered embedding. | Assets absent; manual. |
-| `app/services/combined_test.py` | Standalone camera demo combining liveness and recognition. | Webcam, models, Windows-specific paths. | Not part of the API; manual. |
-| `app/services/register_face.py` | Creates an embedding from `test.jpg` and saves it under `../../data/face_embeddings/`. | InsightFace model, `test.jpg`, writable path. | Hardcoded student ID and paths. |
+| `manual/api_attendance.py` | Authenticates, starts a liveness session, opens a webcam, sends frames, waits for a blink, then submits the final frame to `/attendance/verify`. | Running API, provisioned student account, webcam, `requests`, OpenCV, registered embedding for `STU001`. | Manual, no assertions; prompts for a password; hardcoded student/subject/lecture; reads `ATTENDANCE_API_URL` and `ATTENDANCE_USERNAME`. |
+| `manual/liveness_service.py` | Older liveness camera script. | Webcam, MediaPipe model. | Broken import: `from app.services.liveness import LivenessService`; not runnable as‑is without `PYTHONPATH=.`. |
+| `manual/attendance_verification.py` | Full camera liveness + face‑recognition flow. | Webcam, MediaPipe + InsightFace models, embedding for `STU001`. | Manual; no assertions. |
+| `manual/embedding.py` | Extracts an InsightFace embedding from a fixture image. | `manual/fixtures/test.jpg` (or provide `INSIGHTFACE_ROOT`), InsightFace model. | Fixture absent; manual. |
+| `manual/face_detector.py` | Legacy MediaPipe face‑detector check. | `manual/fixtures/test.jpg`, `models/mediapipe/blaze_face_short_range.tflite`. | Fixture/model absent; uses a different model than the app. |
+| `manual/landmarks.py` | MediaPipe landmark and EAR check on a closed‑eye image. | `manual/fixtures/closed_eye.jpeg`, `models/mediapipe/face_landmarker.task`. | Fixtures/model absent; manual. |
+| `manual/recognition.py` | Compares a fixture image with `data/face_embeddings/STU001.npy`. | Fixture image, InsightFace model, registered embedding. | Assets absent; manual. |
+| `manual/liveness_anti_spoofing.py` | Camera liveness test with anti‑spoofing status display. | Webcam, MediaPipe model. | Manual; no assertions. |
+| `manual/combined_demo.py` | Standalone camera demo combining liveness and recognition. | Webcam, models, Windows‑specific paths. | Not part of the API; manual. |
+
+To run any of these scripts from the repository root:
+
+```bash
+PYTHONPATH=. python -m manual.script_name
+```
+
+or
+
+```bash
+python manual/script_name.py   # (runs from the repo root directory)
+```
+
+The `pytest.ini` file configures `pytest` to only collect tests under `tests/runtime/`, so these manual scripts are never executed by `pytest`.
+
+## CI
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on pull requests and pushes to `main`:
+
+- **Compile and test**: installs pinned dependencies, runs `python -m compileall -q app tests`, and runs `python -m pytest tests/runtime -q`.
+- **Secret scan**: runs `gitleaks/gitleaks-action` with full Git history.
+
+CI does not download model assets, open a camera, or run the manual scripts. A passing run proves only the checks listed above.
+
+Branch protection is **not configured** because the current collaborator account does not have repository admin permission. The repository owner must apply these settings:
+
+1. Open **Settings → Branches → Add branch protection rule**.
+2. Set the branch name pattern to `main`.
+3. Enable **Require a pull request before merging**.
+4. Enable **Require status checks to pass before merging** and select `Compile and test` and `Secret scan`.
+5. Enable **Require branches to be up to date before merging**.
+6. Disable force pushes and branch deletion.
+7. Save the rule.
+
+Until that rule exists, CI results are advisory rather than enforced by GitHub.
 | `app/services/recognize_face.py` | Compares `test.jpg` with a registered embedding. | InsightFace model, `test.jpg`, embedding. | Hardcoded paths. |
 
 ## Why the scripts are not automated tests
@@ -69,7 +105,7 @@ They verify syntax, focused runtime behavior, and diff hygiene. They do not prov
 - **Compile and test**: installs pinned dependencies, runs `python -m compileall -q app tests`, and runs `python -m pytest tests/runtime -q`.
 - **Secret scan**: runs `gitleaks/gitleaks-action` with full Git history.
 
-CI does not download model assets, open a camera, or run the manual scripts. A passing run proves only the checks listed above.
+CI does not download model assets, open a camera, or run the manual scripts. A passing run proves only the checks listed above. Both jobs passed on PR #22: `Compile and test` in 56 seconds and `Secret scan` in 7 seconds.
 
 Branch protection is **not configured** because the current collaborator account does not have repository admin permission. The repository owner must apply these settings:
 

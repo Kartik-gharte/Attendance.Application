@@ -136,7 +136,7 @@ git switch -c fix/example
 git status
 git diff
 git diff --check
-python -m compileall -q app tests test_api_attendance.py test_liveness_service.py
+python -m compileall -q app tests
 git diff --cached
 ```
 
