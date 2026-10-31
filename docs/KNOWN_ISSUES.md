@@ -159,10 +159,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-018 — No CI or verified branch protection
 
-- **Evidence:** No workflow files exist in the repository. Branch protection/required reviews were not verified.
-- **Impact:** Checks and review requirements depend on individual discipline.
-- **Proposed fix:** Add CI for syntax/tests/secret scanning and configure branch protection with explicit maintainer approval.
-- **Status:** Open.
+- **Evidence:** A CI workflow now runs compile checks, focused tests, and gitleaks. Branch protection still requires repository-owner action and has not been configured.
+- **Impact:** Checks exist, but GitHub does not yet block merges when they fail.
+- **Proposed fix:** Apply the documented `main` branch-protection rule requiring the `Compile and test` and `Secret scan` checks.
+- **Status:** Partially resolved; CI is defined, branch protection is documented but not configured.
 
 ### KI-019 — Dead/duplicate code paths
 
