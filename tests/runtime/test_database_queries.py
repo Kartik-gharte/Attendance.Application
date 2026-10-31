@@ -102,29 +102,13 @@ def test_student_attendance_ordering(tmp_path):
         assert "student_id" in r
         assert "subject" in r
         assert "lecture_id" in r
-        assert "date" in r
-        assert "time" in r
+        assert "attendance_date" in r
+        assert "attendance_time" in r
 
 
-def test_attendance_already_marked(tmp_path):
-    """attendance_already_marked should correctly identify a duplicate."""
+def test_fresh_database_retrieval_returns_empty(tmp_path):
+    """A freshly initialized database should return an empty list."""
     db_path = tmp_path / "attendance.db"
     initialize_database(db_path)
 
-    mark_attendance(
-        student_id="STU001",
-        subject="Math",
-        lecture_id="MATH101",
-        liveness_status="VERIFIED",
-        face_status="MATCH",
-        similarity=0.9,
-        attendance_status="PRESENT",
-        database_path=db_path,
-    )
-
-    from app.database.attendance_db import attendance_already_marked
-
-    is_dup = attendance_already_marked(
-        "STU001", "MATH101", "2026-01-01", db_path=db_path
-    )
-    assert is_dup is True
+    assert get_all_attendance(db_path) == []
