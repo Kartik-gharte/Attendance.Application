@@ -14,7 +14,7 @@
 | Remote branches | `main` plus active topic branches until their PRs merge |
 | Local backups | `refs/backup/feature-ai-attendance-security`, `refs/backup/feature-attendance-verification-stable`, `refs/backup/main-before-attendance-merge-2026-10-26`, `refs/backup/main-initial` |
 | Open stabilization backlog | [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13) |
-| CI | No workflow exists in the repository; branch protection has not been verified |
+| CI | Workflow exists; branch protection is not configured |
 | Test suite | 45 focused runtime tests exist under `tests/runtime/`; the broader pytest suite and CI are still tracked in [#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7) |
 
 ## Status legend
@@ -47,7 +47,7 @@
 | Automated tests | Partial | Focused settings, startup, database, API, validation, and authentication runtime tests pass (45 tests); manual camera scripts remain unsafe for pytest collection; broader pytest suite and CI are still open. |
 | Syntax check | Verified | `python -m compileall -q app tests` passed. |
 | Lint/type checks | Not configured | No verified tool configuration exists. |
-| CI | Not implemented | No workflow files; checks are manual. |
+| CI | Implemented, first run pending | Compile, runtime tests, and gitleaks run on pull requests and `main`; branch protection still requires owner action. |
 | Privacy controls | Partial | Git ignores biometric, account, token, and attendance data; no retention/deletion/consent implementation. |
 | Deployment | Not implemented | No container, service, or deployment documentation. |
 | Project documentation | In progress | Runtime, database, configuration, API, security, authentication, and validation docs updated for the current implementation. |

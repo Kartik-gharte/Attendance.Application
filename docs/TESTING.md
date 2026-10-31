@@ -62,6 +62,27 @@ git diff --check
 
 They verify syntax, focused runtime behavior, and diff hygiene. They do not prove the camera-based flows.
 
+## CI
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on pull requests and pushes to `main`:
+
+- **Compile and test**: installs pinned dependencies, runs `python -m compileall -q app tests`, and runs `python -m pytest tests/runtime -q`.
+- **Secret scan**: runs `gitleaks/gitleaks-action` with full Git history.
+
+CI does not download model assets, open a camera, or run the manual scripts. A passing run proves only the checks listed above.
+
+Branch protection is **not configured** because the current collaborator account does not have repository admin permission. The repository owner must apply these settings:
+
+1. Open **Settings → Branches → Add branch protection rule**.
+2. Set the branch name pattern to `main`.
+3. Enable **Require a pull request before merging**.
+4. Enable **Require status checks to pass before merging** and select `Compile and test` and `Secret scan`.
+5. Enable **Require branches to be up to date before merging**.
+6. Disable force pushes and branch deletion.
+7. Save the rule.
+
+Until that rule exists, CI results are advisory rather than enforced by GitHub.
+
 ## Future automated test plan
 
 Proposed for Phase 2 of the [roadmap](ROADMAP.md):

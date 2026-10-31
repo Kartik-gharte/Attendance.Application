@@ -107,10 +107,15 @@ Do not approve a change that claims unverified behavior works.
 
 ## Merge policy
 
-No branch protection, required reviews, required checks, or merge strategy are configured or verified in this repository. Until they are:
+The CI workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs compile checks, focused tests, and a secret scan on pull requests and pushes to `main`.
+
+Branch protection is not configured yet. The repository owner should create a `main` protection rule that requires a pull request, the `Compile and test` and `Secret scan` checks, an up-to-date branch, and no force pushes or deletions. The exact steps are in [TESTING.md](TESTING.md#ci).
+
+Until the rule exists:
 
 - obtain explicit human approval;
 - run the checks documented in the pull request;
+- confirm both CI jobs pass before merging;
 - use the merge method agreed by the maintainer;
 - do not force-push shared branches;
 - do not rewrite `main` history.

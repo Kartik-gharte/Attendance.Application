@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Configurable `AUTH_TOKEN_TTL_SECONDS` (default 3600).
 - Bearer-token authentication in the manual `test_api_attendance.py` client, with password prompt and `ATTENDANCE_API_URL`/`ATTENDANCE_USERNAME` overrides.
 - Runtime tests for login/logout, token expiry/revocation, 401/403 behavior, cross-student denial, session ownership, and account validation (45 focused tests total).
+- GitHub Actions CI for compile checks, focused runtime tests, and gitleaks secret scanning, with documented branch-protection steps.
 
 ### Changed
 
