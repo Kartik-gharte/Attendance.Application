@@ -1,6 +1,6 @@
 # Known Issues
 
-These are confirmed gaps based on source inspection and repository state as of 2026-10-30. KI-001, KI-002, KI-003, KI-009, and KI-013 are resolved; the remaining issues are still open.
+These are confirmed gaps based on source inspection and repository state as of 2026-10-31. KI-001, KI-002, KI-003, KI-005, KI-007, KI-009, KI-010, and KI-013 are resolved; the remaining issues are still open.
 
 Severity is a triage aid, not a formal risk rating.
 
@@ -12,12 +12,12 @@ Severity is a triage aid, not a formal risk rating.
 | KI-002 | Critical | Hardcoded Windows model path | Resolved |
 | KI-003 | Critical | Database schema is never initialized | Resolved |
 | KI-004 | Critical | No authentication or authorization | Open |
-| KI-005 | High | `student_id` is used in a filesystem path without validation | Open |
+| KI-005 | High | `student_id` is used in a filesystem path without validation | Resolved |
 | KI-006 | High | Liveness sessions are bearer-like and replayable | Open |
-| KI-007 | High | No upload size/type limits or domain validation | Open |
+| KI-007 | High | No upload size/type limits or domain validation | Resolved |
 | KI-008 | High | No automated test suite | Open |
 | KI-009 | High | No configuration system | Resolved |
-| KI-010 | High | Error responses expose internal messages | Open |
+| KI-010 | High | Error responses expose internal messages | Resolved |
 | KI-011 | High | No retention, deletion, encryption, or backup policy | Open |
 | KI-012 | Medium | In-memory sessions are per-process and never cleaned up | Open |
 | KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile | Resolved |
@@ -64,10 +64,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-005 — Unvalidated `student_id` in filesystem path
 
-- **Evidence:** `app/services/face_recognition.py:459-475` builds `data/face_embeddings/<student_id>.npy` directly from request/form data.
+- **Evidence:** `app/services/face_recognition.py` builds the embedding path from request/form data; `app/services/validation.py` now validates identifiers and resolved paths before lookup.
 - **Impact:** Path separators, `..`, or an absolute path in `student_id` may escape the intended directory.
 - **Proposed fix:** Validate against a strict identifier pattern and verify the resolved path remains under the embeddings directory; add adversarial tests.
-- **Status:** Open; security fix required.
+- **Status:** Resolved; validation and containment checks are implemented and covered by focused tests.
 
 ### KI-006 — Liveness sessions are replayable and exposed in query strings
 
@@ -78,10 +78,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-007 — Missing input and upload validation
 
-- **Evidence:** `student_id`, `subject`, and `lecture_id` are plain `Form(...)` strings; images are read without size/content validation; no enrollment/subject authorization checks exist.
-- **Impact:** Oversized uploads, malformed images, arbitrary identifiers, and attendance for unrelated subjects/lectures are possible.
+- **Evidence:** `student_id`, `subject`, and `lecture_id` were previously plain `Form(...)` strings; images were read without size/content validation.
+- **Impact:** Oversized uploads, malformed images, and arbitrary identifiers were possible.
 - **Proposed fix:** Add length/pattern validation, size/type limits, and enrollment/subject checks; return structured errors.
-- **Status:** Open.
+- **Status:** Resolved for input and upload validation; enrollment/subject authorization remains tracked separately.
 
 ### KI-008 — No automated tests
 
@@ -100,10 +100,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-010 — Internal error messages returned to clients
 
-- **Evidence:** `app/api/routes.py:254-268` returns `str(error)` in the response. Retrieval endpoints do not catch `sqlite3` errors.
-- **Impact:** Paths, model errors, and database details may be disclosed; unhandled errors can produce HTTP 500.
+- **Evidence:** The attendance verification route previously returned `str(error)` in the response, and retrieval endpoints did not catch database errors.
+- **Impact:** Paths, model errors, and database details could be disclosed; unhandled errors could produce HTTP 500.
 - **Proposed fix:** Log details server-side with redaction; return stable, non-sensitive error codes/messages.
-- **Status:** Open.
+- **Status:** Resolved; stable attendance and retrieval error responses are implemented.
 
 ### KI-011 — No retention, deletion, encryption, or backup policy
 

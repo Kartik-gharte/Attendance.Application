@@ -30,14 +30,12 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 - [x] Provision models through a documented, non-committed mechanism.
 - [x] Verify startup, `/`, and `/docs`; document the tested platform and versions.
 - [x] Call database initialization during application startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
-- [ ] Validate `student_id` and constrain the embedding path ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
+- [x] Validate `student_id` and constrain the embedding path ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
 - [ ] Fix or remove the broken `test_liveness_service.py` import ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
 - [ ] Make registration output paths project-relative and parameterized ([#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10)).
 - [ ] Verify one consented end-to-end flow.
 
 **Exit criteria:** a fresh environment following [SETUP.md](SETUP.md) starts successfully and the verified commands/values are documented.
-
-**Branch:** `fix/database-initialization`
 
 ## Phase 2 — Automated tests and observability
 
@@ -57,9 +55,10 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 - Add authentication and role-based authorization for staff/student operations.
 - Bind liveness sessions to a request/student and remove session IDs from query strings.
-- Add upload size/type limits and strict input validation.
+- [x] Add upload size/type limits and strict input validation ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
 - Protect or encrypt biometric storage; define retention and deletion.
-- Sanitize error responses and rate-limit endpoints.
+- [x] Sanitize attendance and retrieval error responses.
+- Add rate limiting.
 - Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
 
 **Exit criteria:** all sensitive endpoints require authorization, documented threat-model controls are tested, and privacy handling is reviewed.

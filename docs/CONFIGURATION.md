@@ -24,6 +24,10 @@ working directory. `~` is expanded and paths are normalized with
 | `CORS_ALLOWED_ORIGINS` | Local ports `5500` and `5173` on `127.0.0.1` and `localhost` | Comma-separated CORS origins. | Empty entries are ignored. |
 | `FACE_MATCH_THRESHOLD` | `0.40` | Cosine-similarity threshold for a face `MATCH`. | `0.0`–`1.0`. |
 | `LIVENESS_VALIDITY_SECONDS` | `30` | Window in which a verified liveness session can be used. | Positive integer. |
+| `MAX_UPLOAD_SIZE_BYTES` | `5242880` | Maximum accepted image upload size. | Positive integer. |
+| `MAX_IMAGE_WIDTH` | `4096` | Maximum decoded image width. | `1`–`8192`. |
+| `MAX_IMAGE_HEIGHT` | `4096` | Maximum decoded image height. | `1`–`8192`. |
+| `MAX_IMAGE_PIXELS` | `16777216` | Maximum decoded image pixel count. | `1`–`67108864`. |
 | `INSIGHTFACE_MODEL_NAME` | `buffalo_l` | InsightFace model pack name. | Non-empty string. |
 | `INSIGHTFACE_ROOT` | `~/.insightface` | InsightFace model cache/download directory. | Path. |
 
@@ -94,7 +98,6 @@ relative output paths. Parameterizing them is tracked in
 
 ## Not implemented
 
-- Input validation and upload limits ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
 - Authentication and authorization ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)).
 - Structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).
 - A configurable log level.

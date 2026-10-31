@@ -22,10 +22,13 @@ The system processes:
 
 - SQL queries use parameterized statements.
 - Uploaded attendance images are written to a temporary file and deleted in a `finally` block.
+- Client identifiers are validated and embedding paths are contained before lookup.
+- Upload size, content type, and decoded image limits are enforced before model inference.
 - Liveness sessions expire after `LIVENESS_VALIDITY_SECONDS` (default 30); they are consumed after a face-verification rejection or a database insert attempt.
 - CORS defaults to local development origins and is configurable through `CORS_ALLOWED_ORIGINS`. CORS is not an access-control mechanism.
 - Face images, embeddings, databases, and model files are excluded from Git.
 - Face matching requires a single detected face and a similarity of at least `FACE_MATCH_THRESHOLD` (default `0.40`).
+- Attendance and retrieval error responses use stable client-facing messages; server-side exception details are not returned.
 
 ## Current gaps and risks
 
@@ -43,18 +46,17 @@ Every endpoint is open. Anyone who can reach the API can start sessions, submit 
 
 ### Path construction from user input
 
-`student_id` is interpolated directly into `<FACE_EMBEDDING_DIR>/<student_id>.npy` without validation (`app/services/face_recognition.py`). Values containing path separators, `..`, or an absolute path could escape the embedding directory. Restrict identifiers to a safe pattern and verify the resolved path stays inside the embedding directory.
+`student_id` is validated against a safe identifier pattern and the resolved embedding path is checked against the configured embedding directory before lookup (`app/services/face_recognition.py`). Values containing path separators, `..`, or an absolute path are rejected.
 
 ### Input validation
 
-- `student_id`, `subject`, and `lecture_id` are unrestricted strings.
-- There is no file-size, content-type, or image-dimension limit in the application code.
+- `student_id`, `subject`, and `lecture_id` are now validated, upload size and image limits are enforced, and images are decoded before model inference.
 - There is no verification that the student is enrolled in the supplied subject or lecture.
-- `subject` and `lecture_id` are stored exactly as supplied.
+- `subject` and `lecture_id` are validated with defined limits and patterns before use.
 
 ### Error handling and information disclosure
 
-`POST /attendance/verify` returns `str(error)` to the client, which may expose internal paths, model errors, or database messages. Retrieval endpoints do not catch `sqlite3` errors and can return HTTP `500`.
+`POST /attendance/verify` returns stable internal error messages to clients instead of raw exception text. Retrieval endpoints catch database failures and return a controlled error response.
 
 ### Logging
 
@@ -78,15 +80,16 @@ Face data is sensitive personal data in many jurisdictions, including regimes su
 
 ## Recommended remediation order
 
+Identifier validation, embedding-path containment, upload limits, and stable error responses are already implemented. Remaining work:
+
 1. Add authentication and role-based authorization; protect all attendance endpoints.
-2. Validate `student_id` and verify embedding-path containment.
-3. Bind liveness sessions to a student/request and use non-query transport for session IDs.
-4. Sanitize error responses and introduce structured, redacted logging.
-5. Add HTTPS, rate limiting, request-size limits, and secure deployment configuration.
-6. Encrypt or otherwise protect biometric storage; restrict filesystem access.
-7. Define consent, retention, deletion, and access-review policies.
-8. Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
-9. Add dependency and secret scanning to the development workflow.
+2. Bind liveness sessions to a student/request and use non-query transport for session IDs.
+3. Introduce structured, redacted logging.
+4. Add HTTPS, rate limiting, and secure deployment configuration.
+5. Encrypt or otherwise protect biometric storage; restrict filesystem access.
+6. Define consent, retention, deletion, and access-review policies.
+7. Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
+8. Add dependency and secret scanning to the development workflow.
 
 ## Reporting
 

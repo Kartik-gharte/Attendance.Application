@@ -48,6 +48,7 @@ requests.
 | --- | --- | --- |
 | `app/api/liveness_routes.py` | Session creation, frame decoding, session state, liveness responses. | In-memory `sessions` dict; single process; configurable validity (default 30 seconds); uses the shared service from `app.state`. |
 | `app/api/routes.py` | Attendance verification, temporary image handling, database insert, attendance retrieval. | Uses the shared service from `app.state`; synchronous SQLite calls in an async handler; no authentication. |
+| `app/services/validation.py` | Identifier/session validation, embedding-path containment, upload content/size/dimension checks. | Uses `MAX_UPLOAD_SIZE_BYTES`, `MAX_IMAGE_WIDTH`, `MAX_IMAGE_HEIGHT`, and `MAX_IMAGE_PIXELS`; rejects invalid input before model inference. |
 | `app/services/liveness.py` | MediaPipe Face Landmarker, Eye Aspect Ratio, blink state machine, anti-spoofing invocation. | Model path comes from `MEDIAPIPE_FACE_LANDMARKER_MODEL`; fails fast if the file is missing. |
 | `app/services/anti_spoofing.py` | Face-size, brightness, and Laplacian-variance screening. | Heuristic only; not a trained presentation-attack detector. |
 | `app/services/face_recognition.py` | InsightFace embedding extraction, multi-attempt detection, cosine similarity, registered-embedding loading. | Model name/cache/threshold/embedding directory come from settings; raises on missing/empty assets. |
@@ -66,7 +67,7 @@ requests.
    - `eyes_closed = False`
    - `liveness_verified = False`
    - `verified_at = None`
-2. `POST /liveness/frame` decodes the uploaded JPEG/PNG with OpenCV and calls `LivenessService.process_frame`.
+2. `POST /liveness/frame` validates the session UUID and uploaded image (content type, size, dimensions, decodability), then calls `LivenessService.process_frame`.
 3. MediaPipe returns landmarks for at most one face.
 4. `AntiSpoofingService.check_frame` evaluates face size, brightness, and sharpness.
 5. Eye Aspect Ratio is calculated. Four consecutive closed-eye frames set `eyes_closed`; the next open-eye frame is a blink.
@@ -78,7 +79,7 @@ The liveness session is a bearer-like identifier: anyone who knows a session ID 
 ## Attendance flow
 
 1. `POST /attendance/verify` requires `student_id`, `session_id`, `subject`, `lecture_id`, and an image.
-2. The route validates that the session exists, is liveness-verified, has a timestamp, and is not older than `LIVENESS_VALIDITY_SECONDS` (default 30).
+2. The route validates identifiers, the session, and the uploaded image (content type, size, dimensions, decodability), then checks that the session exists, is liveness-verified, has a timestamp, and is not older than `LIVENESS_VALIDITY_SECONDS` (default 30). Invalid input returns a stable error response.
 3. The uploaded image is written to a temporary file and passed to `AttendanceVerificationService.verify_face`.
 4. `FaceRecognitionService.recognize` loads the image, extracts an embedding using up to five detection attempts, loads `<FACE_EMBEDDING_DIR>/<student_id>.npy`, and computes cosine similarity.
 5. A similarity of at least `FACE_MATCH_THRESHOLD` (default `0.40`) is considered a `MATCH`.
@@ -95,6 +96,7 @@ The liveness session is a bearer-like identifier: anyone who knows a session ID 
 - `FaceRecognitionService` reads `INSIGHTFACE_MODEL_NAME`, `INSIGHTFACE_ROOT`, `FACE_MATCH_THRESHOLD`, and `FACE_EMBEDDING_DIR`.
 - `AttendanceVerificationService` receives the same liveness and face instances used by the routes; services are not duplicated at import.
 - Attendance routes pass `app.state.settings.database_path` to database helpers, so an explicit `Settings` object controls both startup and request-time persistence.
+- Liveness and attendance routes enforce `MAX_UPLOAD_SIZE_BYTES`, `MAX_IMAGE_WIDTH`, `MAX_IMAGE_HEIGHT`, and `MAX_IMAGE_PIXELS` before model inference.
 
 Runtime dependencies are pinned in `requirements.txt`; development dependencies are in `requirements-dev.txt`. The verified platform is documented in [SETUP.md](SETUP.md).
 

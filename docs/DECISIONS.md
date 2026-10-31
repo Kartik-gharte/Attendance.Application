@@ -90,6 +90,14 @@ Record significant repository and architecture decisions here. Add new entries r
 - **Decision:** Initialize the attendance schema with `CREATE TABLE IF NOT EXISTS` in the FastAPI lifespan, using the configured `ATTENDANCE_DB_PATH`, before constructing model services. Pass the configured path to database operations and tests, and defer migrations until the runtime foundation is stable.
 - **Consequences:** Fresh databases are initialized automatically, restart behavior is idempotent, and focused tests can use temporary database paths. The SQLite database remains the current store, and migrations remain a future operational decision.
 
+## D-012 — Validate identifiers and uploads at the API boundary
+
+- **Date:** 2026-10-31
+- **Status:** Accepted
+- **Context:** Attendance and liveness routes previously accepted unvalidated identifiers and image uploads, could build embedding paths outside the configured directory, and returned raw exception text.
+- **Decision:** Centralize identifier, session, and image validation in `app/services/validation.py`. Enforce configurable upload-size and decoded-image limits, require embedding paths to remain under `FACE_EMBEDDING_DIR`, and return stable client-facing error messages. Catch retrieval database errors in the attendance routes.
+- **Consequences:** Invalid input is rejected before model inference, and limits can be tuned with environment variables. Enrollment/subject authorization and authentication remain separate open work.
+
 ## Proposed decisions (not yet accepted)
 
 These are candidates for later phases; they are not implemented:
