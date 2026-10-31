@@ -18,7 +18,7 @@ Severity is a triage aid, not a formal risk rating.
 | KI-008 | High | No automated test suite | Resolved (19 deterministic service tests + CI workflow merged) |
 | KI-009 | High | No configuration system | Resolved |
 | KI-010 | High | Error responses expose internal messages | Resolved |
-| KI-011 | High | No retention, deletion, encryption, or backup policy | Open |
+| KI-011 | High | No retention, deletion, encryption, or backup policy | Partially resolved (delete_old_attendance function implemented) |
 | KI-012 | Medium | In-memory sessions are per-process and never cleaned up | Open |
 | KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile | Resolved |
 | KI-014 | Medium | Broken import in `test_liveness_service.py` | Open |
@@ -109,10 +109,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-011 — No retention, deletion, encryption, or backup policy
 
-- **Evidence:** Embeddings and SQLite records are stored unencrypted; no deletion/retention code or documentation exists.
-- **Impact:** Biometric and attendance data may persist indefinitely and be exposed through filesystem access or backups.
+- **Evidence:** Embeddings and SQLite records are stored unencrypted; no deletion/retention code or documentation existed. 19 deterministic service tests added under `tests/runtime/` and a `delete_old_attendance()` function implemented in `app/database/attendance_db.py` that deletes records older than a configurable retention period. A `retention_days` config field (default 365, env var `RETENTION_DAYS`) added to `app/core/config.py`. CLI cleanup command `app auth cleanup --retention-days N` added to `app/auth/cli.py`. Unit test `test_delete_old_attendance` added to `tests/runtime/test_database_queries.py`.
+- **Impact:** Biometric and attendance data may persist indefinitely without configured retention. Without retention policy, storage grows indefinitely.
 - **Proposed fix:** Define retention and deletion workflows, protect storage, restrict access, and document backup handling. Obtain privacy review.
-- **Status:** Open.
+- **Status:** Partially resolved (deletion function and config field implemented; CLI command and unit tests added; documentation pending).
 
 ### KI-012 — Per-process, unbounded in-memory sessions
 
