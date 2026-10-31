@@ -34,6 +34,22 @@ def test_distance_with_negative_coords():
     assert abs(d - math.sqrt(25)) < 1e-6  # sqrt(4^2+5^2)=5
 
 
+def test_liveness_service_initialization_skips_model_load():
+    """Verify that we can create a LivenessService without triggering
+    the model‑loading path by using ``object.__new__`` and manually
+    setting the required attributes."""
+    lsvc = object.__new__(LivenessService)
+    # Manually set the attributes that __init__ would normally set.
+    lsvc.model_path = "/tmp/nonexistent.model"
+    lsvc.detector = None
+    lsvc.anti_spoofing = None
+    # The constructor prints; we just check that no RuntimeError is raised
+    # when accessing the ``distance`` static method (which does not need
+    # the model).
+    d = LivenessService.distance(Point(0, 0), Point(1, 4))
+    assert abs(d - math.sqrt(17)) < 1e-6
+
+
 def test_ear_calculation_with_mock_landmarks():
     """Test the EAR formula using a mock landmark set.
 
@@ -55,24 +71,8 @@ def test_ear_calculation_with_mock_landmarks():
             # other indices default
             return Point(0.0, 0.0)
 
-    lsvc = LivenessService()
+    lsvc = object.__new__(LivenessService)
     try:
         lsvc.calculate_ear(Landmarks())
     except Exception as e:
         pytest.xfail(f"calculate_ear raised unexpectedly: {e}")
-
-
-def test_liveness_service_initialization_skips_model_load():
-    """Verify that we can create a LivenessService without triggering
-    the model‑loading path by using ``object.__new__`` and manually
-    setting the required attributes."""
-    lsvc = object.__new__(LivenessService)
-    # Manually set the attributes that __init__ would normally set.
-    lsvc.model_path = "/tmp/nonexistent.model"
-    lsvc.detector = None
-    lsvc.anti_spoofing = None
-    # The constructor prints; we just check that no RuntimeError is raised
-    # when accessing the ``distance`` static method (which does not need
-    # the model).
-    d = LivenessService.distance((1, 1), (4, 5))
-    assert abs(d - math.sqrt(17)) < 1e-6
