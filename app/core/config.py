@@ -80,6 +80,33 @@ class Settings(BaseSettings):
         validation_alias="LIVENESS_VALIDITY_SECONDS",
     )
 
+    max_upload_size_bytes: int = Field(
+        default=5 * 1024 * 1024,
+        ge=1,
+        validation_alias="MAX_UPLOAD_SIZE_BYTES",
+    )
+
+    max_image_width: int = Field(
+        default=4096,
+        ge=1,
+        le=8192,
+        validation_alias="MAX_IMAGE_WIDTH",
+    )
+
+    max_image_height: int = Field(
+        default=4096,
+        ge=1,
+        le=8192,
+        validation_alias="MAX_IMAGE_HEIGHT",
+    )
+
+    max_image_pixels: int = Field(
+        default=16 * 1024 * 1024,
+        ge=1,
+        le=64 * 1024 * 1024,
+        validation_alias="MAX_IMAGE_PIXELS",
+    )
+
     insightface_model_name: str = Field(
         default="buffalo_l",
         min_length=1,

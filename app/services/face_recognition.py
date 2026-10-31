@@ -4,6 +4,7 @@ from pathlib import Path
 from insightface.app import FaceAnalysis
 
 from app.core.config import Settings, get_settings
+from app.services.validation import validate_student_id
 
 
 class FaceRecognitionService:
@@ -483,16 +484,21 @@ class FaceRecognitionService:
         student_id
     ):
 
+        validated_student_id = validate_student_id(
+            student_id,
+            self.embedding_dir,
+        )
+
         registered_path = (
             Path(self.embedding_dir)
-            / f"{student_id}.npy"
+            / f"{validated_student_id}.npy"
         )
 
         if not registered_path.exists():
 
             raise FileNotFoundError(
                 "Registered face not found "
-                f"for student: {student_id}"
+                f"for student: {validated_student_id}"
             )
 
         embedding = np.load(
@@ -507,7 +513,7 @@ class FaceRecognitionService:
 
         print(
             "Registered embedding loaded:",
-            student_id
+            validated_student_id
         )
 
         print(
@@ -560,13 +566,18 @@ class FaceRecognitionService:
             image_path
         )
 
+        validated_student_id = validate_student_id(
+            student_id,
+            self.embedding_dir,
+        )
+
         new_embedding = self.get_embedding(
             image_path
         )
 
         registered_embedding = (
             self.load_registered_embedding(
-                student_id
+                validated_student_id
             )
         )
 
@@ -586,7 +597,7 @@ class FaceRecognitionService:
         )
 
         return self.create_recognition_result(
-            student_id,
+            validated_student_id,
             similarity
         )
 
@@ -605,6 +616,11 @@ class FaceRecognitionService:
         print("LIVE FACE RECOGNITION")
         print("======================================")
 
+        validated_student_id = validate_student_id(
+            student_id,
+            self.embedding_dir,
+        )
+
         new_embedding = (
             self.get_embedding_from_frame(
                 frame
@@ -613,7 +629,7 @@ class FaceRecognitionService:
 
         registered_embedding = (
             self.load_registered_embedding(
-                student_id
+                validated_student_id
             )
         )
 
@@ -624,7 +640,7 @@ class FaceRecognitionService:
 
         print(
             "Student ID:",
-            student_id
+            validated_student_id
         )
 
         print(
@@ -638,6 +654,6 @@ class FaceRecognitionService:
         )
 
         return self.create_recognition_result(
-            student_id,
+            validated_student_id,
             similarity
         )
