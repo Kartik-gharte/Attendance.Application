@@ -144,6 +144,12 @@ class Settings(BaseSettings):
             if origin.strip()
         ]
 
+    retention_days: int = Field(
+        default=365,
+        validation_alias="RETENTION_DAYS",
+        description="Number of days to retain attendance records before automatic deletion"
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

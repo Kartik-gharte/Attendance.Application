@@ -9,6 +9,7 @@ from app.auth.service import (
     initialize_auth_database,
     set_password,
 )
+from app.database.attendance_db import delete_old_attendance
 from app.core.config import get_settings
 
 
@@ -71,6 +72,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Disable an account and revoke all active tokens.",
     )
     deactivate.add_argument("username")
+
+
+    cleanup = commands.add_parser(
+        "cleanup",
+        parents=[common],
+        help="Delete old attendance records based on retention policy.",
+    )
+    cleanup.add_argument(
+        "--retention-days",
+        type=int,
+        default=365,
+        help="Delete records older than this many days (default: 365).",
+    )
 
     return parser
 

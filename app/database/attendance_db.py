@@ -316,3 +316,60 @@ def get_all_attendance(database_path=None):
     finally:
 
         connection.close()
+
+
+# =========================================================
+# DELETE OLD ATTENDANCE (RETENTION)
+# =========================================================
+
+def delete_old_attendance(database_path=None, retention_days=365):
+    """
+    Delete attendance records older than retention_days.
+
+    Args:
+        database_path: Path to the SQLite database
+        retention_days: Keep records from this many days back
+
+    Returns:
+        Number of records deleted
+    """
+
+    import sqlite3
+
+    from pathlib import Path
+
+    from datetime import datetime, timedelta
+
+    path = Path(database_path or get_database_path())
+
+    if not path.exists():
+
+        return 0
+
+    cutoff_date = (
+        datetime.now() - timedelta(days=retention_days)
+    ).strftime("%Y-%m-%d")
+
+    connection = get_connection(database_path)
+
+    try:
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            DELETE FROM attendance
+            WHERE attendance_date < ?
+            """,
+            (cutoff_date,)
+        )
+
+        deleted_count = cursor.rowcount
+
+        connection.commit()
+
+        return deleted_count
+
+    finally:
+
+        connection.close()
