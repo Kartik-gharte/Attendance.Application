@@ -8,7 +8,8 @@ This document describes the endpoints implemented in the current code. FastAPI's
 - There is no authentication or authorization.
 - Request bodies use multipart form data where files or `Form` fields are declared.
 - Application-level errors return a JSON object with `status: "error"` and typically HTTP `200`. Missing required form fields are rejected by FastAPI with HTTP `422`.
-- There are no Pydantic request/response models for these routes; field validation is limited to FastAPI's required-field checks and Python string handling.
+- Client-controlled identifiers and uploads are validated before model inference. Upload size and decoded image limits are enforced from settings.
+- Client-facing error messages are stable and do not include internal exception details.
 - CORS allows credentials from the origins in `CORS_ALLOWED_ORIGINS`. The default is `http://127.0.0.1:5500`, `http://localhost:5500`, `http://127.0.0.1:5173`, and `http://localhost:5173`.
 - Liveness sessions are stored in process memory and are not shared between workers or restarts.
 - The `attendance` table is initialized idempotently during application startup. Retrieval against a fresh initialized database returns an empty list.
@@ -75,7 +76,7 @@ Processes one uploaded image for a liveness session.
 | Name | Location | Type | Required | Notes |
 | --- | --- | --- | --- | --- |
 | `session_id` | Query | string | Yes | Session returned by `/liveness/start`. |
-| `image` | Multipart file | file | Yes | JPEG/PNG or another format OpenCV can decode. |
+| `image` | Multipart file | file | Yes | Content type starting with `image/`, decodable by OpenCV, within configured size and dimensions. |
 
 Example:
 
@@ -105,9 +106,12 @@ If the session is already verified and still valid, the route returns a success 
 
 | Condition | Response |
 | --- | --- |
+| Invalid session identifier | `{"status": "error", "message": "Invalid liveness session"}` |
 | Unknown session | `{"status": "error", "message": "Invalid or expired liveness session"}` |
 | Verified session older than `LIVENESS_VALIDITY_SECONDS` (default 30) | Session is deleted; `{"status": "error", "message": "Liveness session expired"}` |
-| Undecodable image | `{"status": "error", "message": "Could not decode image"}` |
+| Invalid or unsupported image | `{"status": "error", "message": "Invalid or unsupported image"}` |
+| Image exceeds maximum allowed size | `{"status": "error", "message": "Image exceeds maximum allowed size"}` |
+| Image dimensions exceed maximum allowed size | `{"status": "error", "message": "Image dimensions exceed maximum allowed size"}` |
 
 **Not exposed in the response:** `LivenessService.process_frame` returns an `anti_spoofing` object, but the route does not include it. The screening result affects the internal `liveness_verified` decision.
 
@@ -123,11 +127,11 @@ Verifies a liveness session and a face image, then attempts to persist attendanc
 
 | Name | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `student_id` | string | Yes | Used to locate `<FACE_EMBEDDING_DIR>/<student_id>.npy`. Not authenticated. |
-| `session_id` | string | Yes | Must be liveness-verified and less than `LIVENESS_VALIDITY_SECONDS` old. |
-| `subject` | string | Yes | Stored as provided; no validation. |
-| `lecture_id` | string | Yes | Stored as provided; no validation. |
-| `image` | file | Yes | Final face image. |
+| `student_id` | string | Yes | Safe identifier (max 64 characters, alphanumeric start, no path separators). Located under `<FACE_EMBEDDING_DIR>`. Not authenticated. |
+| `session_id` | string | Yes | Valid UUID. Must be liveness-verified and less than `LIVENESS_VALIDITY_SECONDS` old. |
+| `subject` | string | Yes | Max 120 characters, non-empty, and free of control characters. |
+| `lecture_id` | string | Yes | Safe identifier (max 64 characters, alphanumeric start, no path separators). |
+| `image` | file | Yes | Content type starting with `image/`, decodable by OpenCV, within configured size and dimensions. |
 
 Example:
 
@@ -146,7 +150,14 @@ These return HTTP `200` with an error object:
 
 | Condition | Response |
 | --- | --- |
+| Invalid session identifier | `{"status": "error", "message": "Invalid liveness session"}` |
 | Unknown session | `{"status": "error", "message": "Invalid or expired liveness session"}` |
+| Invalid student identifier | `{"status": "error", "message": "Invalid student identifier"}` |
+| Invalid subject | `{"status": "error", "message": "Invalid subject"}` |
+| Invalid lecture identifier | `{"status": "error", "message": "Invalid lecture identifier"}` |
+| Invalid or unsupported image | `{"status": "error", "message": "Invalid or unsupported image"}` |
+| Image exceeds maximum allowed size | `{"status": "error", "message": "Image exceeds maximum allowed size"}` |
+| Image dimensions exceed maximum allowed size | `{"status": "error", "message": "Image dimensions exceed maximum allowed size"}` |
 | Session exists but is not liveness-verified | `{"status": "error", "message": "Liveness verification required"}` |
 | Missing verification timestamp | `{"status": "error", "message": "Invalid liveness verification"}` |
 | Verification older than `LIVENESS_VALIDITY_SECONDS` (default 30) | Session removed; `{"status": "error", "message": "Liveness session expired"}` |
@@ -233,11 +244,11 @@ The route catches `Exception` and returns:
 ```json
 {
   "status": "error",
-  "message": "<exception string>"
+  "message": "Internal attendance verification error"
 }
 ```
 
-This may expose internal details. Unexpected database errors also fall into this path.
+The underlying exception details are printed server-side and are not returned to the client.
 
 **Side effects:** writes a temporary file (deleted in `finally`), loads models, may insert an attendance row, and removes the liveness session after rejection or a database attempt. Pre-verification failures do not consume the session, except expiry.
 
@@ -276,7 +287,7 @@ Returns all attendance records for one student, newest first by date and time.
 }
 ```
 
-**Failure behavior:** no route-level error handling. If the configured database cannot be opened or queried, SQLite raises an error that FastAPI returns as an HTTP `500`. A fresh initialized database returns an empty list.
+**Failure behavior:** catches retrieval database exceptions and returns an error object with `status: "error"` and `"message": "Attendance database error"`. A fresh initialized database returns an empty list.
 
 ---
 
@@ -300,6 +311,6 @@ Returns all attendance records, newest first by date and time.
 
 - Every endpoint is unauthenticated and unauthenticated callers can read all attendance records.
 - `session_id` behaves like a bearer token for a short-lived liveness result. Do not log or expose it.
-- `student_id`, `subject`, and `lecture_id` are client-controlled strings with no format validation.
+- `student_id`, `subject`, and `lecture_id` are validated before use, and uploaded images are size- and dimension-checked before model inference.
 - The final attendance image is not cryptographically bound to the liveness frames.
-- Error messages may reveal internal file paths or database errors.
+- Error messages are stable client-facing responses and do not include raw exception details; server-side logs may contain operational details.

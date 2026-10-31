@@ -1,6 +1,6 @@
 # Project Status
 
-**As of:** 2026-10-30
+**As of:** 2026-10-31
 
 ## Repository state
 
@@ -12,7 +12,7 @@
 | Local backups | `refs/backup/feature-ai-attendance-security`, `refs/backup/feature-attendance-verification-stable`, `refs/backup/main-before-attendance-merge-2026-10-26`, `refs/backup/main-initial` |
 | Open stabilization backlog | [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13) |
 | CI | No workflow exists in the repository; branch protection has not been verified |
-| Test suite | 14 focused runtime tests exist under `tests/runtime/`; the broader pytest suite is still tracked in [#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7) |
+| Test suite | 32 focused runtime tests exist under `tests/runtime/`; the broader pytest suite is still tracked in [#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7) |
 
 ## Status legend
 
@@ -35,26 +35,26 @@
 | Blink liveness | Implemented, unverified | MediaPipe landmarks + EAR threshold; accuracy untested. |
 | Anti-spoofing screening | Implemented, unverified | Heuristic size/brightness/sharpness checks; not a trained PAD model. |
 | Face embedding/recognition | Implemented, unverified | InsightFace `buffalo_l`, cosine similarity, configurable threshold; accuracy untested. |
-| Attendance verification API | Implemented, partially verified | `POST /attendance/verify`; success and duplicate paths tested with a temporary database and fake model services. Real model flow unverified. |
+| Attendance verification API | Implemented, partially verified | `POST /attendance/verify`; success, duplicate, validation, upload-limit, and retrieval-error paths tested with a temporary database and fake model services. Real model flow unverified. |
 | Attendance retrieval API | Implemented, verified without models | `GET /attendance/student/{student_id}` and `GET /attendance/all` return empty lists on a fresh initialized database; no auth. |
 | SQLite schema | Implemented, verified | `initialize_database()` runs in the lifespan for `ATTENDANCE_DB_PATH`, creates the table idempotently, and preserves rows across restart. Tests cover fresh creation, retrieval, and duplicate rejection. |
 | Enrollment/registration | Partial | Manual scripts with hardcoded `STU001`, `test.jpg`, and output paths. No API. |
 | Startup resilience | Implemented, verified | Importing `app.main` does not touch models or the database; schema initialization and missing MediaPipe assets fail lifespan startup explicitly. |
-| Automated tests | Partial | Focused settings, startup, database, and API tests pass; manual camera scripts remain unsafe for pytest collection. |
+| Automated tests | Partial | Focused settings, startup, database, API, and validation runtime tests pass (32 tests); manual camera scripts remain unsafe for pytest collection; broader pytest suite is still open. |
 | Syntax check | Verified | `python -m compileall -q app tests` passed. |
 | Lint/type checks | Not configured | No verified tool configuration exists. |
 | CI | Not implemented | No workflow files; checks are manual. |
 | Authentication/authorization | Not implemented | Every endpoint is open. |
 | Privacy controls | Partial | Git ignores biometric artifacts; no retention/deletion/consent implementation. |
 | Deployment | Not implemented | No container, service, or deployment documentation. |
-| Project documentation | In progress | Runtime and database docs updated for startup initialization on `fix/database-initialization`. |
+| Project documentation | In progress | Runtime, database, configuration, API, security, and validation docs updated on `fix/input-validation`. |
 
 ## What was actually verified
 
 On macOS 27.0.1 arm64 with Python 3.11.16:
 
 1. Clean virtual environment installed all runtime dependencies from `requirements.txt`.
-2. `python -m pytest tests/runtime -q` passed (14 tests).
+2. `python -m pytest tests/runtime -q` passed (32 tests), including focused validation, upload-limit, and retrieval-error coverage.
 3. `python -m uvicorn app.main:app` reached "Application startup complete".
 4. `GET /` and `GET /docs` returned `200`.
 5. A temporary configured database was created with the `attendance` table during startup; restart preserved an inserted row.
@@ -73,10 +73,9 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 
 ## Current blockers
 
-1. Input validation, upload limits, and error sanitization are missing ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
-2. Authentication/authorization is missing ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)).
-3. Automated tests and CI are incomplete ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
-4. No liveness, face-recognition, or anti-spoofing accuracy has been measured.
+1. Authentication/authorization is missing ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)).
+2. Automated tests and CI are incomplete ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+3. No liveness, face-recognition, or anti-spoofing accuracy has been measured.
 
 ## Definition of a working next milestone
 

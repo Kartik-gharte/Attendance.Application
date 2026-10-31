@@ -4,6 +4,15 @@ import numpy as np
 import uuid
 import time
 
+from app.services.validation import (
+    IMAGE_TOO_LARGE,
+    INVALID_IMAGE,
+    INVALID_LIVENESS_SESSION,
+    validate_image_bytes,
+    validate_image_content_type,
+    validate_session_id,
+)
+
 
 router = APIRouter()
 
@@ -50,22 +59,29 @@ async def process_liveness_frame(
 ):
 
     liveness_service = request.app.state.liveness_service
+    settings = request.app.state.settings
 
     liveness_validity_seconds = (
-        request.app.state.settings.liveness_validity_seconds
+        settings.liveness_validity_seconds
     )
 
-    # -----------------------------------------------------
-    # CHECK SESSION
-    # -----------------------------------------------------
+    try:
 
-    if session_id not in sessions:
+        validated_session_id = validate_session_id(session_id)
+
+    except ValueError:
+
+        return {
+            "status": "error",
+            "message": INVALID_LIVENESS_SESSION,
+        }
+
+    if validated_session_id != session_id or session_id not in sessions:
 
         return {
             "status": "error",
             "message": "Invalid or expired liveness session"
         }
-
 
     session = sessions[session_id]
 
@@ -109,7 +125,42 @@ async def process_liveness_frame(
     # READ IMAGE
     # -----------------------------------------------------
 
-    image_bytes = await image.read()
+    image_bytes = await image.read(
+        settings.max_upload_size_bytes + 1
+    )
+
+    if len(image_bytes) > settings.max_upload_size_bytes:
+
+        return {
+            "status": "error",
+            "message": IMAGE_TOO_LARGE,
+        }
+
+    if not image_bytes or not validate_image_content_type(
+        image.content_type
+    ):
+
+        return {
+            "status": "error",
+            "message": INVALID_IMAGE,
+        }
+
+    try:
+
+        validate_image_bytes(
+            image_bytes,
+            settings.max_upload_size_bytes,
+            settings.max_image_width,
+            settings.max_image_height,
+            settings.max_image_pixels,
+        )
+
+    except ValueError as error:
+
+        return {
+            "status": "error",
+            "message": str(error),
+        }
 
     image_array = np.frombuffer(
         image_bytes,
@@ -121,12 +172,11 @@ async def process_liveness_frame(
         cv2.IMREAD_COLOR
     )
 
-
     if frame is None:
 
         return {
             "status": "error",
-            "message": "Could not decode image"
+            "message": INVALID_IMAGE,
         }
 
 

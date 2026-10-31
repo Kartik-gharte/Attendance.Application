@@ -12,7 +12,7 @@
 </p>
 
 > [!WARNING]
-> **Active development — not production-ready.** Runtime bootstrap (pinned dependencies, configuration, portable model paths, lifespan-managed services, and SQLite schema initialization) is implemented and was verified on macOS arm64 with Python 3.11. Authentication, input validation, and the automated test/CI baseline are still open. Track stabilization in [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
+> **Active development — not production-ready.** Runtime bootstrap (pinned dependencies, configuration, portable model paths, lifespan-managed services, and SQLite schema initialization) is implemented and was verified on macOS arm64 with Python 3.11. Input validation, upload limits, and stable error responses are implemented for the current API; authentication and the automated test/CI baseline are still open. Track stabilization in [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
 ## What it does
 
@@ -70,7 +70,7 @@ Runtime bootstrap, service wiring, and SQLite schema initialization were verifie
 | Verified locally | Still missing or unverified |
 | --- | --- |
 | Pinned dependencies, validated settings, `.env` support | End-to-end liveness → face match → attendance flow |
-| Startup, `GET /`, `GET /docs`, database initialization, missing-model failure | Auth ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)), input hardening ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)) |
+| Startup, `GET /`, `GET /docs`, database initialization, missing-model failure | Auth ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)) |
 | One MediaPipe and one InsightFace load per process | Retention/deletion ([#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9)), automated tests/CI ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)) |
 
 No benchmarked face-recognition accuracy, liveness performance, or presentation-attack resistance results exist. Stabilization work is sequenced in the [tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
@@ -84,7 +84,7 @@ Install and startup are verified on **Python 3.11.16 / macOS arm64** with the pi
 - Registered embeddings are required for face matching and must never be committed.
 - The FastAPI lifespan initializes the SQLite schema for the configured database path and uses that path for attendance writes and retrieval.
 
-Follow [docs/SETUP.md](docs/SETUP.md) for commands and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for environment variables. The next stabilization work is input validation ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)), authentication ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)), and the automated test/CI baseline ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)). Manual script requirements are in [docs/TESTING.md](docs/TESTING.md).
+Follow [docs/SETUP.md](docs/SETUP.md) for commands and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for environment variables. The next stabilization work is authentication ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)) and the automated test/CI baseline ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)); input validation and upload limits are implemented for the current API. Manual script requirements are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Repository map
 
