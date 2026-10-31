@@ -137,7 +137,7 @@ Read [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) before handlin
 
 ## Contributing
 
-Start from a GitHub issue and a focused branch. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md). Do not commit secrets, biometric data, model files, or local databases.
+Start from a GitHub issue and a focused branch. Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md). Prefer multiple small, coherent contributions (focused commits and, when practical, separate PRs) over one large change. Do not commit secrets, biometric data, model files, or local databases.
 
 ## Maintainer
 

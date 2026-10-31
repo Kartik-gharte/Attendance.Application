@@ -42,6 +42,7 @@ Notes:
 ## Review checklist
 
 - [ ] Scope matches the linked issue.
+- [ ] Change is split into focused commits or multiple PRs where separable.
 - [ ] No unrelated refactoring or feature work.
 - [ ] Tests cover changed behavior where practical.
 - [ ] `git diff --check` passes.

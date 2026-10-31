@@ -2,6 +2,8 @@
 
 Thank you for helping improve Attendance.Application. This project is an academic/experimental attendance-verification backend. Please keep changes focused, documented, and safe for biometric data.
 
+Prefer multiple small, coherent contributions over one large change. Separate behavior, tests, and documentation when that keeps each contribution independently reviewable; use multiple focused commits and, when practical, multiple pull requests.
+
 ## Before you start
 
 1. Read [README.md](README.md), [AGENTS.md](AGENTS.md), and [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md).
@@ -36,7 +38,7 @@ Use these prefixes:
 - `docs/` — documentation only
 - `chore/` — maintenance, tooling, or configuration
 
-Keep one logical change per branch. Avoid mixing refactoring with behavior changes.
+Keep one logical change per branch. Avoid mixing refactoring with behavior changes. For larger work, split it into multiple focused commits and, when independently reviewable, multiple branches and pull requests.
 
 ## Commit messages
 
@@ -99,7 +101,7 @@ Keep links valid and avoid duplicating the same content across files.
 3. Link the related issue.
 4. Describe the change, the verification performed, and any unverified behavior.
 5. Call out security, privacy, API, and database implications.
-6. Keep the pull request focused; split unrelated work.
+6. Keep the pull request focused; split unrelated work into separate contributions.
 7. Respond to review comments and re-run checks after changes.
 
 Do not merge without review and explicit approval. Branch protection, required reviews, and CI are not currently verified in this repository.
