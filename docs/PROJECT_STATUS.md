@@ -1,6 +1,6 @@
 # Project Status
 
-**As of:** 2026-10-31
+**As of:** 2026-11-01
 
 ## Repository state
 
@@ -10,6 +10,7 @@
 | Runtime bootstrap | Merged via PR #17 at `323db2f` |
 | Validation and security hardening | Merged via PR #18 at `ae8d8d3` |
 | AI attendance verification | Merged via PR #19 at `30da359` |
+| Authentication and authorization | PR #20 |
 | Remote branches | `main` plus active topic branches until their PRs merge |
 | Local backups | `refs/backup/feature-ai-attendance-security`, `refs/backup/feature-attendance-verification-stable`, `refs/backup/main-before-attendance-merge-2026-10-26`, `refs/backup/main-initial` |
 | Open stabilization backlog | [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13) |
