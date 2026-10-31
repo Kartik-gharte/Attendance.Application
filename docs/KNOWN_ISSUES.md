@@ -15,17 +15,17 @@ Severity is a triage aid, not a formal risk rating.
 | KI-005 | High | `student_id` is used in a filesystem path without validation | Resolved |
 | KI-006 | High | Liveness sessions are bearer-like and replayable | Partially resolved |
 | KI-007 | High | No upload size/type limits or domain validation | Resolved |
-| KI-008 | High | No automated test suite | Open |
+| KI-008 | High | No automated test suite | Resolved (19 deterministic service tests + CI workflow merged) |
 | KI-009 | High | No configuration system | Resolved |
 | KI-010 | High | Error responses expose internal messages | Resolved |
 | KI-011 | High | No retention, deletion, encryption, or backup policy | Open |
 | KI-012 | Medium | In-memory sessions are per-process and never cleaned up | Open |
 | KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile | Resolved |
 | KI-014 | Medium | Broken import in `test_liveness_service.py` | Open |
-| KI-015 | Medium | Missing fixtures and model assets | Open |
+| KI-015 | Medium | Missing fixtures and model assets | Resolved (tests use synthetic fixtures, no model/assets required) |
 | KI-016 | Medium | Registration and client paths/IDs are hardcoded | Open |
 | KI-017 | Medium | Logs contain personal data and use `print()` | Open |
-| KI-018 | Medium | No CI or verified branch protection | Open |
+| KI-018 | Medium | No CI or verified branch protection | CI workflow merged; branch protection not configured (requires manual enablement) |
 | KI-019 | Low | Dead/duplicate code paths and scripts | Open |
 | KI-020 | High | Anti-spoofing effectiveness is unmeasured | Open |
 
@@ -87,10 +87,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-008 — No automated tests
 
-- **Evidence:** Focused runtime tests now exist under `tests/runtime/` (45 passing tests) and cover settings, startup, database, validation, authentication, and attendance API behavior with fake model services. Root `test_*.py` files still execute top-level code, open cameras, use `exit()`, and require absent fixtures. No CI workflow exists.
-- **Impact:** The focused suite catches regressions in covered paths, but model/camera scripts remain dangerous to collect and there is no CI enforcement.
-- **Proposed fix:** Keep expanding deterministic tests and add CI; retire or isolate manual scripts.
-- **Status:** Open; focused coverage exists, broader suite and CI remain Phase 2 priority ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+- **Evidence:** 19 deterministic service tests added under `tests/runtime/` (anti-spoofing, face recognition, liveness logic, database queries) that exercise pure logic without camera or model dependencies. CI workflow merged in PR #24 runs `python -m compileall -q app tests` + `python -m pytest tests/runtime -q` on every PR and on `main`. Root `test_*.py` files still execute top-level code, open cameras, use `exit()`, and require absent fixtures; these have been moved to `manual/` (PR #23).
+- **Impact:** The focused suite catches regressions in EAR, similarity comparison, anti-spoofing size/brightness/sharpness, and database behavior. No CI enforcement remains for the root scripts; branch protection is not configured (see KI-018).
+- **Proposed fix:** Expand deterministic tests to cover API error paths, add temporary-database tests, and enable branch protection/required checks on `main`.
+- **Status:** Resolved (PR #24 merged 2026-10-31); 19 tests pass locally, CI passes on `main`. Broader coverage and CI enforcement are tracked as follow-ups.
 
 ### KI-009 — No configuration system
 
@@ -138,10 +138,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-015 — Missing fixtures and model assets
 
-- **Evidence:** Scripts reference `tests/fixtures/test.jpg`, `closed_eye.jpeg`, `test.jpg`, `blaze_face_short_range.tflite`, and `face_landmarker.task`; none are present in the repository. Images/models are ignored by Git. The MediaPipe application model and InsightFace cache now have documented provisioning in [SETUP.md](SETUP.md), but script fixtures are still absent.
-- **Impact:** Manual scripts cannot run from a clean checkout without additional fixtures.
-- **Proposed fix:** Document asset provisioning; use synthetic or consented fixtures; provide an opt-in local setup path without committing biometric data or large models.
-- **Status:** Open.
+- **Evidence:** Scripts reference `tests/fixtures/test.jpg`, `closed_eye.jpeg`, `test.jpg`, `blaze_face_short_range.tflite`, and `face_landmarker.task`; none are present in the repository. Images/models are ignored by Git. The MediaPipe application model and InsightFace cache now have documented provisioning in [SETUP.md](SETUP.md), but script fixtures are still absent. 19 deterministic service tests use only synthetic arrays and `SimpleLandmark` objects; no model files or camera access is required.
+- **Impact:** Manual scripts cannot run from a clean checkout without additional fixtures. The deterministic test suite eliminates the fixture requirement for core logic coverage.
+- **Proposed fix:** Document asset provisioning; use synthetic or consented fixtures; provide an opt-in local setup path without committing biometric data or large models. Keep retiring manual scripts to `manual/`.
+- **Status:** Resolved (PR #23 + PR #24); deterministic tests run without model/assets. Manual scripts remain in `manual/` for opt-in use.
 
 ### KI-016 — Hardcoded registration and client values
 
@@ -160,9 +160,9 @@ Severity is a triage aid, not a formal risk rating.
 ### KI-018 — No CI or verified branch protection
 
 - **Evidence:** A CI workflow now runs compile checks, focused tests, and gitleaks. Branch protection still requires repository-owner action and has not been configured.
-- **Impact:** Checks exist, but GitHub does not yet block merges when they fail.
-- **Proposed fix:** Apply the documented `main` branch-protection rule requiring the `Compile and test` and `Secret scan` checks.
-- **Status:** Partially resolved; CI passed on PR #22, branch protection is documented but not configured.
+- **Impact:** CI workflow merged in PR #24 runs compile checks, focused tests, and gitleaks on every PR and on `main`. Branch protection is not configured; merges are not blocked when checks fail (see KI-018 summary).
+- **Proposed fix:** Enable branch protection on `main` requiring the `Compile and test` and `Secret scan` checks; enforce via repository settings.
+- **Status:** Partially resolved; CI workflow is merged and passing, but branch protection requires repository-owner action.
 
 ### KI-019 — Dead/duplicate code paths
 
