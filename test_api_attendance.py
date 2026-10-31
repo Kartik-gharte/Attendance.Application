@@ -1,4 +1,6 @@
 import cv2
+import getpass
+import os
 import requests
 import time
 
@@ -7,7 +9,15 @@ import time
 # CONFIGURATION
 # =========================================================
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = os.getenv(
+    "ATTENDANCE_API_URL",
+    "http://127.0.0.1:8000",
+)
+
+USERNAME = os.getenv(
+    "ATTENDANCE_USERNAME",
+    "student1",
+)
 
 STUDENT_ID = "STU001"
 SUBJECT = "Java Programming"
@@ -27,10 +37,39 @@ print("       API ATTENDANCE TEST")
 print("======================================")
 print()
 
+print("Authenticating...")
+
+password = getpass.getpass("Password: ")
+
+auth_response = requests.post(
+    f"{BASE_URL}/auth/token",
+    data={
+        "username": USERNAME,
+        "password": password,
+    },
+    timeout=10,
+)
+
+if auth_response.status_code != 200:
+
+    print("ERROR: Could not authenticate")
+    print(auth_response.text)
+    exit()
+
+access_token = auth_response.json()["access_token"]
+
+AUTH_HEADERS = {
+    "Authorization": f"Bearer {access_token}",
+}
+
+print("Authenticated as:", USERNAME)
+print()
+
 print("Starting liveness session...")
 
 response = requests.post(
-    f"{BASE_URL}/liveness/start"
+    f"{BASE_URL}/liveness/start",
+    headers=AUTH_HEADERS,
 )
 
 if response.status_code != 200:
@@ -131,6 +170,7 @@ while True:
                     params={
                         "session_id": session_id
                     },
+                    headers=AUTH_HEADERS,
                     files=files,
                     timeout=10
                 )
@@ -354,6 +394,7 @@ try:
     response = requests.post(
         f"{BASE_URL}/attendance/verify",
         data=data,
+        headers=AUTH_HEADERS,
         files=files,
         timeout=30
     )
