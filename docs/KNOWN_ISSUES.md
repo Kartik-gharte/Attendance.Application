@@ -162,7 +162,7 @@ Severity is a triage aid, not a formal risk rating.
 - **Evidence:** A CI workflow now runs compile checks, focused tests, and gitleaks. Branch protection still requires repository-owner action and has not been configured.
 - **Impact:** Checks exist, but GitHub does not yet block merges when they fail.
 - **Proposed fix:** Apply the documented `main` branch-protection rule requiring the `Compile and test` and `Secret scan` checks.
-- **Status:** Partially resolved; CI is defined, branch protection is documented but not configured.
+- **Status:** Partially resolved; CI passed on PR #22, branch protection is documented but not configured.
 
 ### KI-019 — Dead/duplicate code paths
 

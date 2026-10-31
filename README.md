@@ -76,8 +76,9 @@ Runtime bootstrap, service wiring, SQLite schema initialization, and the local a
 | --- | --- |
 | Pinned dependencies, validated settings, `.env` support | End-to-end liveness → face match → attendance flow |
 | Startup, `GET /`, `GET /docs`, database initialization, missing-model failure | TLS, rate limiting, account lockout, MFA/SSO, audit logging |
-| One MediaPipe and one InsightFace load per process | Retention/deletion ([#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9)), automated tests/CI ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)) |
+| One MediaPipe and one InsightFace load per process | Retention/deletion ([#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9)), broader service tests (#7) |
 | Local login/logout, token expiry/revocation, student self-access, admin read-only access | Manual client camera run with authentication; hardcoded student/subject/lecture values ([#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10)) |
+| CI compile, runtime-test, and gitleaks checks on PR #22 | Enforced branch protection; broader automated coverage (#7) |
 
 No benchmarked face-recognition accuracy, liveness performance, or presentation-attack resistance results exist. Stabilization work is sequenced in the [tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
@@ -91,7 +92,7 @@ Install and startup are verified on **Python 3.11.16 / macOS arm64** with the pi
 - The FastAPI lifespan initializes the attendance, user, and token schemas for the configured database path and uses that path for attendance writes, retrieval, and authentication.
 - Local accounts are provisioned with `python -m app.auth.cli`; there is no public signup.
 
-Follow [docs/SETUP.md](docs/SETUP.md) for commands and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for environment variables. The next stabilization work is the automated test/CI baseline ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)); local authentication and authorization are implemented, while TLS, rate limiting, and broader operational controls remain open. Manual script requirements are in [docs/TESTING.md](docs/TESTING.md).
+Follow [docs/SETUP.md](docs/SETUP.md) for commands and [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for environment variables. CI is running; the next stabilization work is broader deterministic service coverage and manual-script isolation ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)). Local authentication and authorization are implemented, while TLS, rate limiting, and broader operational controls remain open. Manual script requirements are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Repository map
 
