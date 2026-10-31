@@ -1,9 +1,24 @@
-from fastapi import APIRouter, Request, UploadFile, File, Form
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 import tempfile
 import os
 import time
 
 from app.api.liveness_routes import sessions
+from app.auth.dependencies import (
+    get_current_user,
+    require_admin,
+    require_student,
+)
+from app.auth.models import ADMIN_ROLE, STUDENT_ROLE, UserPrincipal
 from app.services.validation import (
     DATABASE_ERROR,
     IMAGE_TOO_LARGE,
@@ -40,7 +55,8 @@ async def verify_attendance(
     session_id: str = Form(...),
     subject: str = Form(...),
     lecture_id: str = Form(...),
-    image: UploadFile = File(...)
+    image: UploadFile = File(...),
+    current_user: UserPrincipal = Depends(require_student),
 ):
 
     attendance_service = request.app.state.attendance_service
@@ -72,6 +88,13 @@ async def verify_attendance(
 
     session = sessions[session_id]
 
+    if session.get("user_id") != current_user.id:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
     try:
 
         validated_student_id = validate_student_id(student_id)
@@ -82,6 +105,13 @@ async def verify_attendance(
             "status": "error",
             "message": INVALID_STUDENT_ID,
         }
+
+    if validated_student_id != current_user.student_id:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
 
     try:
 
@@ -392,8 +422,24 @@ async def verify_attendance(
 @router.get("/attendance/student/{student_id}")
 def get_student_attendance(
     request: Request,
-    student_id: str
+    student_id: str,
+    current_user: UserPrincipal = Depends(get_current_user),
 ):
+
+    if (
+        current_user.role == STUDENT_ROLE
+        and current_user.student_id != student_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+
+    if current_user.role not in {STUDENT_ROLE, ADMIN_ROLE}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
 
     from app.database.attendance_db import (
         get_student_attendance as fetch_student_attendance
@@ -426,7 +472,10 @@ def get_student_attendance(
 # =========================================================
 
 @router.get("/attendance/all")
-def get_all_attendance(request: Request):
+def get_all_attendance(
+    request: Request,
+    _current_user: UserPrincipal = Depends(require_admin),
+):
 
     from app.database.attendance_db import (
         get_all_attendance as fetch_all_attendance

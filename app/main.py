@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.liveness_routes import router as liveness_router
 from app.api.routes import router
+from app.auth.routes import router as auth_router
+from app.auth.service import initialize_auth_database
 from app.core.config import Settings, get_settings
 from app.core.services import AppServices, build_services
 from app.database.attendance_db import initialize_database
@@ -25,8 +27,10 @@ def create_app(
         application.state.settings = app_settings
 
         initialize_database(app_settings.database_path)
+        initialize_auth_database(app_settings.database_path)
 
         application.state.database_initialized = True
+        application.state.auth_initialized = True
 
         print("Database schema initialized")
 
@@ -58,6 +62,7 @@ def create_app(
 
     application.include_router(router)
     application.include_router(liveness_router)
+    application.include_router(auth_router)
 
     @application.get("/")
     def root():

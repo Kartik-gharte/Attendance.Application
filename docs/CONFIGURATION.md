@@ -24,6 +24,7 @@ working directory. `~` is expanded and paths are normalized with
 | `CORS_ALLOWED_ORIGINS` | Local ports `5500` and `5173` on `127.0.0.1` and `localhost` | Comma-separated CORS origins. | Empty entries are ignored. |
 | `FACE_MATCH_THRESHOLD` | `0.40` | Cosine-similarity threshold for a face `MATCH`. | `0.0`–`1.0`. |
 | `LIVENESS_VALIDITY_SECONDS` | `30` | Window in which a verified liveness session can be used. | Positive integer. |
+| `AUTH_TOKEN_TTL_SECONDS` | `3600` | Lifetime of opaque bearer tokens issued by `/auth/token`. | `60`–`604800`. |
 | `MAX_UPLOAD_SIZE_BYTES` | `5242880` | Maximum accepted image upload size. | Positive integer. |
 | `MAX_IMAGE_WIDTH` | `4096` | Maximum decoded image width. | `1`–`8192`. |
 | `MAX_IMAGE_HEIGHT` | `4096` | Maximum decoded image height. | `1`–`8192`. |
@@ -43,11 +44,14 @@ lifespan handler. The lifespan:
 2. Calls `initialize_database(settings.database_path)`, which creates the parent
    directory and the idempotent `attendance` schema, then sets
    `app.state.database_initialized = True`.
-3. Calls `build_services(settings)` once.
-4. Creates one `LivenessService`, one `FaceRecognitionService`, and one
+3. Calls `initialize_auth_database(settings.database_path)`, which creates the
+   `users` and `auth_tokens` tables idempotently and sets
+   `app.state.auth_initialized = True`.
+4. Calls `build_services(settings)` once.
+5. Creates one `LivenessService`, one `FaceRecognitionService`, and one
    `AttendanceVerificationService` that shares those instances.
-5. Stores the services on `app.state`.
-6. Closes the MediaPipe detector on shutdown.
+6. Stores the services on `app.state`.
+7. Closes the MediaPipe detector on shutdown.
 
 If the MediaPipe model file does not exist, startup fails with:
 
@@ -86,19 +90,41 @@ These are heuristic values, not calibrated or certified security thresholds.
 
 | Setting | Value | Location |
 | --- | --- | --- |
-| API base URL | `http://127.0.0.1:8000` | `test_api_attendance.py` |
+| API base URL | `ATTENDANCE_API_URL`, default `http://127.0.0.1:8000` | `test_api_attendance.py` |
+| Login username | `ATTENDANCE_USERNAME`, default `student1` | `test_api_attendance.py` |
+| Login password | Prompted with `getpass` at runtime | `test_api_attendance.py` |
 | Student ID | `STU001` | `test_api_attendance.py`, registration scripts |
 | Subject | `Java Programming` | `test_api_attendance.py` |
 | Lecture ID | `JAVA-LECTURE-API-001` | `test_api_attendance.py` |
 | Registration output | `../../data/face_embeddings/STU001.npy` | `app/services/register_face.py` |
 
-The manual client and registration scripts still use hardcoded values and
-relative output paths. Parameterizing them is tracked in
+The manual API client prompts for a password and obtains a bearer token from
+`POST /auth/token`. It reads `ATTENDANCE_API_URL` and `ATTENDANCE_USERNAME` from
+the environment. It still uses hardcoded values for the student ID, subject,
+and lecture, and the registration scripts still use hardcoded paths.
+Parameterizing the remaining values is tracked in
 [#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10).
+
+## Account provisioning
+
+Local accounts are created with the CLI, not a public endpoint:
+
+```bash
+python -m app.auth.cli create-user student1 \
+  --role student --student-id STU001
+python -m app.auth.cli create-user admin1 --role admin
+python -m app.auth.cli set-password student1
+python -m app.auth.cli deactivate-user student1
+```
+
+The CLI prompts for the password without placing it in shell history. Use
+`--database-path` to target a database other than `ATTENDANCE_DB_PATH`. Password
+reset and deactivation revoke all active tokens for that account.
 
 ## Not implemented
 
-- Authentication and authorization ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)).
+- Rate limiting, account lockout, and login audit logging.
+- SSO, institutional identity providers, and multi-factor authentication.
 - Structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).
 - A configurable log level.
 

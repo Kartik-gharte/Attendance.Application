@@ -80,6 +80,13 @@ class Settings(BaseSettings):
         validation_alias="LIVENESS_VALIDITY_SECONDS",
     )
 
+    auth_token_ttl_seconds: int = Field(
+        default=3600,
+        ge=60,
+        le=604800,
+        validation_alias="AUTH_TOKEN_TTL_SECONDS",
+    )
+
     max_upload_size_bytes: int = Field(
         default=5 * 1024 * 1024,
         ge=1,

@@ -1,9 +1,19 @@
-from fastapi import APIRouter, Request, UploadFile, File
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 import cv2
 import numpy as np
 import uuid
 import time
 
+from app.auth.dependencies import require_student
+from app.auth.models import UserPrincipal
 from app.services.validation import (
     IMAGE_TOO_LARGE,
     INVALID_IMAGE,
@@ -29,11 +39,14 @@ sessions = {}
 # =========================================================
 
 @router.post("/liveness/start")
-async def start_liveness():
+async def start_liveness(
+    current_user: UserPrincipal = Depends(require_student),
+):
 
     session_id = str(uuid.uuid4())
 
     sessions[session_id] = {
+        "user_id": current_user.id,
         "closed_frames": 0,
         "eyes_closed": False,
         "liveness_verified": False,
@@ -55,7 +68,8 @@ async def start_liveness():
 async def process_liveness_frame(
     request: Request,
     session_id: str,
-    image: UploadFile = File(...)
+    image: UploadFile = File(...),
+    current_user: UserPrincipal = Depends(require_student),
 ):
 
     liveness_service = request.app.state.liveness_service
@@ -84,6 +98,13 @@ async def process_liveness_frame(
         }
 
     session = sessions[session_id]
+
+    if session.get("user_id") != current_user.id:
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
 
 
     # -----------------------------------------------------

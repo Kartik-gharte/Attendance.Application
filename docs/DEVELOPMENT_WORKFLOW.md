@@ -3,7 +3,8 @@
 ## Principles
 
 - Work from an issue, not an unstated idea.
-- Keep changes small and independently reviewable.
+- Prefer multiple small, focused contributions over one large change.
+- Keep every contribution independently reviewable and buildable.
 - Preserve existing behavior unless the issue explicitly changes it.
 - Update documentation with behavior changes.
 - Never commit secrets, biometric data, local databases, or model files.
@@ -14,7 +15,7 @@
 1. **Select or create an issue.** Define the problem, scope, and acceptance criteria using `.github/ISSUE_TEMPLATE/`.
 2. **Update local information.** Fetch and confirm `main` is current.
 3. **Create a focused branch** from `main` using the naming conventions below.
-4. **Implement the task.** Avoid unrelated refactoring or opportunistic changes.
+4. **Implement the task in slices.** Split behavior, tests, and documentation into multiple focused commits; use sequential or stacked pull requests when the slices are independently reviewable. Avoid unrelated refactoring or opportunistic changes.
 5. **Add or update tests.** If automated tests are not available, describe the manual verification and remaining gaps.
 6. **Update documentation** affected by the change.
 7. **Run checks.** At minimum, compile/syntax checks and `git diff --check`; run the available test suite when one exists.
@@ -55,7 +56,7 @@ Common types: `feat`, `fix`, `test`, `docs`, `chore`, `refactor`, `build`, `ci`.
 - Report what was run and what could not be run.
 - Do not claim a test passed unless it was executed.
 
-Current tests are manual scripts; see [TESTING.md](TESTING.md).
+Focused runtime tests live under `tests/runtime/`; camera-dependent scripts remain manual. See [TESTING.md](TESTING.md).
 
 ## Documentation expectations
 
@@ -88,7 +89,7 @@ Use `.github/PULL_REQUEST_TEMPLATE.md`. A good pull request includes:
 - documentation updates;
 - breaking changes, if any.
 
-Keep pull requests small. Split unrelated cleanup into a separate issue and branch.
+Keep pull requests small. Split unrelated cleanup into a separate issue and branch. For larger features, use multiple focused PRs and avoid one large mixed change.
 
 ## Review expectations
 

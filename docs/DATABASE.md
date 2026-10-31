@@ -10,7 +10,9 @@
 
 ## Schema
 
-The only table defined in the code is `attendance`:
+The code defines three tables: `attendance`, `users`, and `auth_tokens`.
+
+### Attendance
 
 ```sql
 CREATE TABLE IF NOT EXISTS attendance (
@@ -32,7 +34,7 @@ CREATE TABLE IF NOT EXISTS attendance (
 | Column | Type | Nullable | Notes |
 | --- | --- | --- | --- |
 | `id` | INTEGER | No | Primary key, auto-increment. |
-| `student_id` | TEXT | No | Client-supplied identifier. |
+| `student_id` | TEXT | No | Must match the authenticated student's account for API writes. |
 | `subject` | TEXT | No | Client-supplied subject name. |
 | `lecture_id` | TEXT | No | Client-supplied lecture identifier. |
 | `attendance_date` | TEXT | No | Local date, `YYYY-MM-DD`. |
@@ -45,18 +47,75 @@ CREATE TABLE IF NOT EXISTS attendance (
 
 The unique constraint prevents more than one record for the same student, lecture, and date. No additional indexes are defined; SQLite creates an automatic index for the unique constraint.
 
+### Users
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('student', 'admin')),
+    student_id TEXT UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    created_at TEXT NOT NULL,
+    CHECK (
+        (role = 'student' AND student_id IS NOT NULL)
+        OR (role = 'admin' AND student_id IS NULL)
+    )
+);
+```
+
+| Column | Type | Nullable | Notes |
+| --- | --- | --- | --- |
+| `id` | INTEGER | No | Primary key. |
+| `username` | TEXT | No | Case-insensitive unique login name, stored lowercase. |
+| `password_hash` | TEXT | No | Argon2id hash; never a plaintext password. |
+| `role` | TEXT | No | `student` or `admin`. |
+| `student_id` | TEXT | Yes | Required for students; prohibited for admins. Unique when present. |
+| `is_active` | INTEGER | No | `1` for active, `0` after deactivation. |
+| `created_at` | TEXT | No | UTC ISO 8601 timestamp. |
+
+### Auth tokens
+
+```sql
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_auth_tokens_user_id ON auth_tokens (user_id);
+CREATE INDEX idx_auth_tokens_expires_at ON auth_tokens (expires_at);
+```
+
+| Column | Type | Nullable | Notes |
+| --- | --- | --- | --- |
+| `id` | INTEGER | No | Primary key. |
+| `user_id` | INTEGER | No | References `users.id`. |
+| `token_hash` | TEXT | No | SHA-256 hash of the opaque bearer token; unique. |
+| `created_at` | TEXT | No | UTC ISO 8601 timestamp. |
+| `expires_at` | TEXT | No | UTC ISO 8601 expiry timestamp. |
+| `revoked_at` | TEXT | Yes | Set when the token is revoked. |
+
+Plaintext bearer tokens are returned once to the client and are not stored. Expired tokens are deleted opportunistically when a new token is issued; revoked tokens are retained until manual cleanup.
+
 ## Initialization status
 
-`initialize_database()` is called from the FastAPI lifespan before model services are constructed. It:
+The FastAPI lifespan calls `initialize_database()` and `initialize_auth_database()` before model services are constructed. They:
 
-1. Creates the configured parent directory through `get_connection()`.
-2. Runs `CREATE TABLE IF NOT EXISTS attendance` with the existing schema and unique constraint.
-3. Commits, closes the connection in `finally`, sets `app.state.database_initialized = True`, and prints `Database schema initialized`.
+1. Create the configured parent directory through `get_connection()`.
+2. Run `CREATE TABLE IF NOT EXISTS` for `attendance`, `users`, and `auth_tokens`, including the unique constraints and indexes.
+3. Commit and close the connection in `finally`.
+4. Set `app.state.database_initialized = True` and `app.state.auth_initialized = True`.
 
 The operation is idempotent, so restarting against an existing database preserves rows. A failure during initialization aborts startup and closes the connection. `get_connection()` itself only creates the parent directory and opens the database; it does not create tables.
 
-Fresh initialization, restart preservation, API retrieval, and duplicate rejection are covered by focused tests without loading real models:
-`tests/runtime/test_database_path.py`, `tests/runtime/test_app_startup.py`, and `tests/runtime/test_attendance_api.py`.
+Fresh initialization, restart preservation, API retrieval, duplicate rejection, account provisioning, token lifecycle, and authorization are covered by focused tests without loading real models:
+`tests/runtime/test_database_path.py`, `tests/runtime/test_app_startup.py`, `tests/runtime/test_attendance_api.py`, and `tests/runtime/test_auth.py`.
 
 ## Write path
 
@@ -78,7 +137,8 @@ The route maps a duplicate result to `status: "duplicate"` and `attendance_statu
 - Use parameterized queries.
 - Return a list of dictionaries.
 - Order by `attendance_date DESC, attendance_time DESC`.
-- Have no pagination, filtering, or access control.
+- Have no pagination or filtering.
+- Are protected at the API layer: students can read only their own records; admins can read any student's records and the full list. The database helpers themselves do not enforce access control.
 
 ## Duplicate helper
 
@@ -90,7 +150,9 @@ There is no migration framework, schema version table, or upgrade path. The sche
 
 ## Time handling
 
-All timestamps are local server time (`datetime.now()`) without timezone information. Duplicate attendance is scoped to the server's local calendar date. This is ambiguous across timezones and daylight-saving changes. A future fix should standardize on UTC or an explicit application timezone.
+Attendance timestamps are local server time (`datetime.now()`) without timezone information. Duplicate attendance is scoped to the server's local calendar date. This is ambiguous across timezones and daylight-saving changes. A future fix should standardize on UTC or an explicit application timezone.
+
+Authentication timestamps (`users.created_at`, `auth_tokens.created_at`, `expires_at`, and `revoked_at`) are UTC ISO 8601 values with an offset. Token expiry and revocation comparisons use UTC.
 
 ## Testing the database safely
 

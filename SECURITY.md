@@ -31,11 +31,16 @@ There is no security contact email declared in this repository. Do not invent on
 
 The current application:
 
-- has no authentication or authorization;
-- exposes attendance retrieval endpoints without access control;
-- stores liveness sessions in process memory;
-- uses heuristic image screening plus a blink check, not a trained presentation-attack detection system;
-- may return internal error strings to clients;
+- uses local accounts and opaque bearer tokens, with student self-access and
+  read-only admin attendance access;
+- binds liveness sessions to the authenticated user but stores them in process
+  memory;
+- does not implement TLS, rate limiting, account lockout, MFA/SSO, or audit
+  logging;
+- uses heuristic image screening plus a blink check, not a trained
+  presentation-attack detection system;
+- normalizes validation and common retrieval errors but may still expose
+  unexpected internal errors;
 - has no documented data-retention or deletion policy.
 
 These are known limitations, not guarantees of safety. See [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).

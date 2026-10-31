@@ -65,17 +65,20 @@ def test_lifespan_initializes_database_and_serves_root_and_docs(
             is services.attendance_service
         )
         assert app.state.database_initialized is True
+        assert app.state.auth_initialized is True
 
     with sqlite3.connect(database_path) as connection:
 
-        table = connection.execute(
-            """
-            SELECT name
-            FROM sqlite_master
-            WHERE type = 'table'
-            AND name = 'attendance'
-            """
-        ).fetchone()
+        tables = {
+            row[0]
+            for row in connection.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'table'
+                """
+            )
+        }
 
-    assert table == ("attendance",)
+    assert {"attendance", "users", "auth_tokens"} <= tables
     assert services.liveness_service.closed is True

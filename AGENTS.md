@@ -25,6 +25,10 @@ Relevant source files:
 - `app/main.py`
 - `app/api/routes.py`
 - `app/api/liveness_routes.py`
+- `app/auth/routes.py`
+- `app/auth/dependencies.py`
+- `app/auth/service.py`
+- `app/auth/cli.py`
 - `app/services/liveness.py`
 - `app/services/anti_spoofing.py`
 - `app/services/face_recognition.py`
@@ -44,7 +48,7 @@ Relevant source files:
 9. Never describe the heuristic anti-spoofing checks as a trained or certified presentation-attack detection system.
 10. Never represent planned features as implemented.
 11. Update documentation whenever behavior, configuration, architecture, or project status changes.
-12. Prefer focused, independently reviewable changes.
+12. Prefer multiple focused, independently reviewable contributions over one large change; split by behavior, tests, and documentation when each slice remains coherent.
 13. Run relevant verification commands when practical and clearly report what was not tested.
 
 ## Working method
@@ -52,7 +56,7 @@ Relevant source files:
 1. Inspect `git status`, the active branch, and the relevant docs and code.
 2. State the intended change and the files involved before editing.
 3. Create or switch to a focused branch when authorized.
-4. Keep the change scoped to one issue.
+4. Keep each contribution scoped to one issue and one logical change. Split larger work into multiple focused commits and, when independently reviewable, multiple pull requests.
 5. Add or update tests when behavior changes. If automated tests are not available, explain the manual verification performed and what remains unverified.
 6. Update the relevant docs in the same change.
 7. Run available checks: syntax/compile checks, tests, and `git diff --check`.
@@ -65,6 +69,7 @@ Relevant source files:
 - Use prefixes such as `feat/`, `fix/`, `test/`, `docs/`, and `chore/`.
 - Follow [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md).
 - Use the pull request template in `.github/PULL_REQUEST_TEMPLATE.md`.
+- Prefer multiple focused commits. When work has separable stages, land sequential or stacked pull requests and keep every contribution buildable and tested.
 - Do not create remote branches, issues, or pull requests without explicit authorization.
 - Do not assume branch protection or CI exists; verify it first.
 

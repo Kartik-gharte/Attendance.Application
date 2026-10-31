@@ -53,12 +53,13 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 **Goal:** protect biometric operations and attendance records.
 
-- Add authentication and role-based authorization for staff/student operations.
-- Bind liveness sessions to a request/student and remove session IDs from query strings.
+- [x] Add local authentication and role-based authorization for staff/student operations ([#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4)).
+- [x] Bind liveness sessions to an authenticated user, and deny cross-student session use.
+- [ ] Remove session IDs from query strings and add device/replay protection.
 - [x] Add upload size/type limits and strict input validation ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
 - Protect or encrypt biometric storage; define retention and deletion.
 - [x] Sanitize attendance and retrieval error responses.
-- Add rate limiting.
+- Add rate limiting, account lockout, and audit logging.
 - Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
 
 **Exit criteria:** all sensitive endpoints require authorization, documented threat-model controls are tested, and privacy handling is reviewed.

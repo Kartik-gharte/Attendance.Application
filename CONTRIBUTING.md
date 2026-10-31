@@ -2,6 +2,8 @@
 
 Thank you for helping improve Attendance.Application. This project is an academic/experimental attendance-verification backend. Please keep changes focused, documented, and safe for biometric data.
 
+Prefer multiple small, coherent contributions over one large change. Separate behavior, tests, and documentation when that keeps each contribution independently reviewable; use multiple focused commits and, when practical, multiple pull requests.
+
 ## Before you start
 
 1. Read [README.md](README.md), [AGENTS.md](AGENTS.md), and [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md).
@@ -11,12 +13,12 @@ Thank you for helping improve Attendance.Application. This project is an academi
 
 ## Local prerequisites
 
-- Python and `pip`/`venv`. The exact supported Python version is not yet verified; see [docs/SETUP.md](docs/SETUP.md).
+- Python 3.11.16 on macOS arm64 is the verified environment; see [docs/SETUP.md](docs/SETUP.md).
 - A webcam for manual end-to-end tests.
 - MediaPipe Face Landmarker and InsightFace `buffalo_l` model assets for runtime tests.
 - SQLite (included with Python).
 
-Setup is currently blocked by known runtime gaps. Do not claim that a fresh clone is runnable until [docs/SETUP.md](docs/SETUP.md) is updated with a verified workflow.
+Install and startup are verified on the documented platform. The camera-based end-to-end flow still requires model assets, a registered embedding, and a provisioned account, and has not been verified end-to-end.
 
 ## Branch naming
 
@@ -36,7 +38,7 @@ Use these prefixes:
 - `docs/` — documentation only
 - `chore/` — maintenance, tooling, or configuration
 
-Keep one logical change per branch. Avoid mixing refactoring with behavior changes.
+Keep one logical change per branch. Avoid mixing refactoring with behavior changes. For larger work, split it into multiple focused commits and, when independently reviewable, multiple branches and pull requests.
 
 ## Commit messages
 
@@ -73,7 +75,7 @@ Use the imperative mood and a concise subject. Add a body when the reason or tra
   - a focused manual check of the changed flow.
 - Report exactly what was run and what could not be run. Do not claim a test passed unless it was executed.
 
-The current test files are manual scripts, not a pytest suite. See [docs/TESTING.md](docs/TESTING.md).
+Focused runtime tests live under `tests/runtime/`; camera-dependent scripts remain manual. See [docs/TESTING.md](docs/TESTING.md).
 
 ## Documentation
 
@@ -99,7 +101,7 @@ Keep links valid and avoid duplicating the same content across files.
 3. Link the related issue.
 4. Describe the change, the verification performed, and any unverified behavior.
 5. Call out security, privacy, API, and database implications.
-6. Keep the pull request focused; split unrelated work.
+6. Keep the pull request focused; split unrelated work into separate contributions.
 7. Respond to review comments and re-run checks after changes.
 
 Do not merge without review and explicit approval. Branch protection, required reviews, and CI are not currently verified in this repository.

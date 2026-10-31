@@ -13,14 +13,22 @@ The system processes:
 | Face images / webcam frames | HTTP uploads; the final attendance image is briefly written to a temporary file | High — biometric identifiers. |
 | Face embeddings (`.npy`) | `FACE_EMBEDDING_DIR/<student_id>.npy` (default `data/face_embeddings/`) | High — derived biometric data. |
 | Attendance records | `ATTENDANCE_DB_PATH` (default `data/attendance.db`) | Personal data (student ID, subject, lecture, timestamps, similarity). |
+| Account data | `users` table in `ATTENDANCE_DB_PATH` | Username, Argon2id password hash, role, linked student ID. |
+| Bearer tokens | `auth_tokens` table and client memory | Sensitive credentials; only SHA-256 hashes and expiry timestamps are stored. |
 | Liveness session IDs | Process memory, query strings, client state | Sensitive short-lived capability. |
-| Console logs | Standard output | May contain student IDs, subject/lecture IDs, filenames, similarity, and error text. |
+| Console logs | Standard output | May contain student IDs, subject/lecture IDs, filenames, similarity, and error text. Credentials and raw tokens are not logged by the current code. |
 
 `.gitignore` excludes `data/`, `models/`, `*.npy`, `*.db`, `.env`, and image files. This is a repository-hygiene control, not encryption or access control.
 
 ## Current controls
 
 - SQL queries use parameterized statements.
+- Local accounts are required for biometric operations and attendance retrieval. There is no public signup.
+- Passwords are hashed with Argon2id (`argon2-cffi`) with a minimum length of 12 characters. Plaintext passwords are not stored.
+- Authentication uses opaque 256-bit bearer tokens. The server stores only SHA-256 token hashes, expiry timestamps, and revocation timestamps.
+- Tokens expire after `AUTH_TOKEN_TTL_SECONDS` (default 3600 seconds). Logout, password reset, and account deactivation revoke tokens.
+- Students can only mark and read their own attendance. Admins can read attendance but cannot mark it.
+- Liveness sessions are bound to the authenticated user ID and cannot be submitted by another authenticated student.
 - Uploaded attendance images are written to a temporary file and deleted in a `finally` block.
 - Client identifiers are validated and embedding paths are contained before lookup.
 - Upload size, content type, and decoded image limits are enforced before model inference.
@@ -29,20 +37,30 @@ The system processes:
 - Face images, embeddings, databases, and model files are excluded from Git.
 - Face matching requires a single detected face and a similarity of at least `FACE_MATCH_THRESHOLD` (default `0.40`).
 - Attendance and retrieval error responses use stable client-facing messages; server-side exception details are not returned.
+- Authentication failures return `401`; role and ownership violations return `403`.
 
 ## Current gaps and risks
 
-### No authentication or authorization
+### Authentication and authorization limits
 
-Every endpoint is open. Anyone who can reach the API can start sessions, submit frames, mark attendance for a supplied `student_id`, and read all attendance records. CORS is not an access-control mechanism; non-browser clients can call the API directly.
+Authentication is implemented, but it is a local-account baseline, not a production identity platform:
+
+- Account provisioning and password resets are manual CLI operations.
+- There is no rate limiting, account lockout, login audit log, or anomaly detection.
+- Tokens are bearer credentials. Anyone who obtains one can use it until expiry or revocation; there is no sender binding, device binding, or token-theft detection.
+- There is no MFA, SSO, or institutional identity integration.
+- There is no per-lecture enrollment or subject-level authorization; a student can mark attendance for any subject/lecture ID with a matching face.
+- Admin accounts have broad read access to all attendance records; there is no finer-grained faculty scoping.
+- TLS is not configured by the application. Bearer tokens and passwords must not be sent over plaintext networks.
 
 ### Session and replay risks
 
-- Liveness sessions are bearer-like identifiers with no binding to a student, device, or IP address.
+- Liveness sessions are bound to an authenticated user ID, but they remain bearer-like identifiers with no device, IP, or cryptographic challenge binding.
 - `session_id` is sent as a query parameter for `/liveness/frame`, so it may be captured in proxy or server logs.
 - The final attendance image is not cryptographically tied to the liveness frames.
 - Sessions are stored in one process's memory; multiple workers or restarts change behavior.
 - Abandoned sessions are never cleaned up, causing unbounded memory growth over time.
+- A captured session may be replayed within the configured validity window by the same authenticated user.
 
 ### Path construction from user input
 
@@ -80,16 +98,17 @@ Face data is sensitive personal data in many jurisdictions, including regimes su
 
 ## Recommended remediation order
 
-Identifier validation, embedding-path containment, upload limits, and stable error responses are already implemented. Remaining work:
+Identifier validation, embedding-path containment, upload limits, stable error responses, local authentication, and role-based attendance authorization are already implemented. Remaining work:
 
-1. Add authentication and role-based authorization; protect all attendance endpoints.
-2. Bind liveness sessions to a student/request and use non-query transport for session IDs.
+1. Add rate limiting, account lockout, and login/authorization audit events.
+2. Move liveness session IDs out of query strings and bind them to a stronger one-time challenge.
 3. Introduce structured, redacted logging.
-4. Add HTTPS, rate limiting, and secure deployment configuration.
+4. Add HTTPS, secure deployment configuration, and token handling guidance for clients.
 5. Encrypt or otherwise protect biometric storage; restrict filesystem access.
 6. Define consent, retention, deletion, and access-review policies.
 7. Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
 8. Add dependency and secret scanning to the development workflow.
+9. Consider SSO/institutional identity and MFA before broader deployment.
 
 ## Reporting
 

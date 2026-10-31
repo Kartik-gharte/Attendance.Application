@@ -4,7 +4,7 @@
 
 Attendance.Application is an AI-assisted attendance verification backend. It verifies a student's identity from a camera image, checks that the interaction includes a blink, applies basic image-quality screening, and records verified attendance in SQLite.
 
-The project is an academic/experimental system. It is not a production attendance platform and does not currently provide authentication, authorization, a user interface, or a certified presentation-attack detection system.
+The project is an academic/experimental system. It is not a production attendance platform. It provides a local-account authentication and role-based authorization baseline, but not institutional identity, a user interface, or a certified presentation-attack detection system.
 
 ## Scope
 
@@ -17,12 +17,13 @@ The project is an academic/experimental system. It is not a production attendanc
 - Attendance verification decisions.
 - SQLite attendance records and duplicate prevention.
 - Attendance retrieval by student and for all records.
+- Local student/admin accounts, opaque bearer tokens, and role-based access.
 - Manual scripts for registration, recognition, liveness, and API testing.
 
 ### Explicitly out of scope for the current baseline
 
-- Student, faculty, or administrator accounts.
-- Authentication, authorization, and role-based access.
+- Institutional SSO, MFA, self-service registration, and password recovery.
+- Rate limiting, account lockout, and comprehensive audit logging.
 - A web or mobile client.
 - Attendance reports, dashboards, or analytics.
 - Production deployment, monitoring, and ERP integration.
@@ -33,11 +34,11 @@ The project is an academic/experimental system. It is not a production attendanc
 
 | User | Current reality | Intended future role |
 | --- | --- | --- |
-| Student | No account or UI. A manual client can submit a face image and student ID. | Verify their own attendance through a client. |
-| Faculty/administrator | No account or UI. | Manage lectures and review attendance. |
-| Developer/researcher | Runs the API and manual scripts locally. | Maintain and extend the system. |
+| Student | Local account linked to one `student_id`; can start liveness sessions and mark/read only their own attendance. No UI. | Verify their own attendance through a client. |
+| Faculty/administrator | Local admin account; can read any student's attendance and all records, but cannot mark attendance. No UI. | Manage lectures and review attendance; finer-grained faculty scoping is future work. |
+| Developer/researcher | Provisions accounts with the CLI, runs the API, and maintains manual scripts locally. | Maintain and extend the system. |
 
-There is no user model or identity provider in the current code. The `student_id` is supplied by the client and is not authenticated.
+Accounts are stored locally in SQLite. There is no public signup or institutional identity provider. The authenticated student's account determines which `student_id` can be marked and read.
 
 ## Functional requirements
 
@@ -64,10 +65,10 @@ Status labels:
 | FR-12 | Retrieve attendance | Implemented (runtime unverified) | `GET /attendance/student/{student_id}` and `GET /attendance/all`. |
 | FR-13 | Expire and consume liveness sessions | Implemented (runtime unverified) | Configurable validity (default 30 seconds); session removed after rejection, success, or expiry. |
 | FR-14 | Register a student's face | Partially implemented | `app/services/register_face.py` is a manual script with hardcoded `STU001`, `test.jpg`, and a relative output path. Not exposed through the API. |
-| FR-15 | Authenticate users | Planned | No authentication code or dependency exists. |
-| FR-16 | Authorize attendance access | Planned | Retrieval endpoints are open to any caller. |
-| FR-17 | Provide a web client | Planned | The only client is `test_api_attendance.py`. |
-| FR-18 | Automated test suite | Planned | Files named `test_*.py` are manual scripts, not pytest tests. |
+| FR-15 | Authenticate users | Implemented (verified with temporary storage and fake services) | Local accounts with Argon2id password hashes and opaque bearer tokens in `app/auth/`; CLI provisioning. Real deployment, TLS, and identity-provider integration remain unverified. |
+| FR-16 | Authorize attendance access | Implemented (verified with temporary storage and fake services) | Students can mark/read only their own attendance; admins can read all records but cannot mark attendance. Liveness sessions are bound to the authenticated user. |
+| FR-17 | Provide a web client | Planned | The only client is the manual `test_api_attendance.py`; it now authenticates but still uses hardcoded student/subject/lecture values. |
+| FR-18 | Automated test suite | Partially implemented | Focused runtime tests exist (45 tests); the broader suite and CI remain open in [#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7). |
 | FR-19 | Reports and dashboards | Planned | No reporting endpoints or UI. |
 | FR-20 | Database migrations | Planned | No migration tooling or versioned schema. |
 
@@ -75,8 +76,8 @@ Status labels:
 
 | Area | Current state |
 | --- | --- |
-| Security | No authentication or authorization. Heuristic anti-spoofing only. Error messages may disclose internals. |
-| Privacy | Face embeddings and attendance databases are local and gitignored. No retention/deletion policy or consent workflow. |
+| Security | Local-account authentication, opaque bearer tokens, and role-based attendance authorization are implemented. Heuristic anti-spoofing only. TLS, rate limiting, MFA, and audit logging are not implemented. |
+| Privacy | Face embeddings, account data, and attendance databases are local and gitignored. No retention/deletion policy or consent workflow. |
 | Portability | Startup verified on macOS arm64. The MediaPipe path, embedding directory, database path, CORS origins, and InsightFace cache are configurable. Windows/Linux are unverified. |
 | Reproducibility | Runtime and development dependencies are pinned; a clean Python 3.11.16 virtual environment installed successfully. |
 | Persistence | A fresh configured database is initialized at startup; restart preserves rows; duplicate insertion is rejected. |
@@ -91,7 +92,9 @@ Status labels:
 - A camera is required for the intended liveness flow.
 - MediaPipe and InsightFace model assets are required at runtime and are not committed.
 - Each student must have a registered embedding under `data/face_embeddings/<student_id>.npy`.
+- Each student and admin must have a locally provisioned account. There is no public signup.
 - The current deployment model is a single local FastAPI process with SQLite.
+- Bearer tokens and passwords must be transported over TLS; the application does not terminate or enforce TLS itself.
 - Liveness frames and the final attendance image are separate HTTP requests; the final image is not tied cryptographically to the liveness frames.
 
 ## Acceptance criteria for a future stable baseline

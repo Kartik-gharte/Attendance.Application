@@ -25,6 +25,7 @@ def test_defaults_use_project_root_paths():
         settings.database_path
         == PROJECT_ROOT / "data" / "attendance.db"
     )
+    assert settings.auth_token_ttl_seconds == 3600
 
 
 def test_environment_overrides_relative_paths(monkeypatch, tmp_path):
@@ -39,6 +40,7 @@ def test_environment_overrides_relative_paths(monkeypatch, tmp_path):
     monkeypatch.setenv("ATTENDANCE_DB_PATH", "custom/attendance.db")
     monkeypatch.setenv("FACE_MATCH_THRESHOLD", "0.55")
     monkeypatch.setenv("LIVENESS_VALIDITY_SECONDS", "15")
+    monkeypatch.setenv("AUTH_TOKEN_TTL_SECONDS", "90")
     monkeypatch.setenv("INSIGHTFACE_MODEL_NAME", "test-model")
     monkeypatch.setenv("INSIGHTFACE_ROOT", "custom/insightface")
 
@@ -55,6 +57,7 @@ def test_environment_overrides_relative_paths(monkeypatch, tmp_path):
     )
     assert settings.face_match_threshold == 0.55
     assert settings.liveness_validity_seconds == 15
+    assert settings.auth_token_ttl_seconds == 90
     assert settings.insightface_model_name == "test-model"
     assert (
         settings.insightface_root
@@ -80,6 +83,14 @@ def test_cors_origins_are_parsed_from_comma_separated_value(monkeypatch):
 def test_invalid_threshold_is_rejected(monkeypatch):
 
     monkeypatch.setenv("FACE_MATCH_THRESHOLD", "1.5")
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_invalid_auth_token_ttl_is_rejected(monkeypatch):
+
+    monkeypatch.setenv("AUTH_TOKEN_TTL_SECONDS", "10")
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
