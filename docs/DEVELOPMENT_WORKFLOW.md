@@ -55,7 +55,7 @@ Common types: `feat`, `fix`, `test`, `docs`, `chore`, `refactor`, `build`, `ci`.
 - Report what was run and what could not be run.
 - Do not claim a test passed unless it was executed.
 
-Current tests are manual scripts; see [TESTING.md](TESTING.md).
+Focused runtime tests live under `tests/runtime/`; camera-dependent scripts remain manual. See [TESTING.md](TESTING.md).
 
 ## Documentation expectations
 

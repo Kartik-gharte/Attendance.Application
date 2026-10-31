@@ -25,6 +25,10 @@ Relevant source files:
 - `app/main.py`
 - `app/api/routes.py`
 - `app/api/liveness_routes.py`
+- `app/auth/routes.py`
+- `app/auth/dependencies.py`
+- `app/auth/service.py`
+- `app/auth/cli.py`
 - `app/services/liveness.py`
 - `app/services/anti_spoofing.py`
 - `app/services/face_recognition.py`

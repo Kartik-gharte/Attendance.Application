@@ -19,6 +19,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `app/services/validation.py` for identifier/session validation, embedding-path containment, and upload content/size/dimension checks.
 - Configurable `MAX_UPLOAD_SIZE_BYTES`, `MAX_IMAGE_WIDTH`, `MAX_IMAGE_HEIGHT`, and `MAX_IMAGE_PIXELS` settings.
 - FastAPI lifespan-managed service construction with a shared `LivenessService` and `FaceRecognitionService`.
+- Local account authentication in `app/auth/`: Argon2id password hashing, opaque bearer tokens stored as SHA-256 hashes, token expiry, revocation, and SQLite-backed users/tokens.
+- `POST /auth/token`, `GET /auth/me`, and `POST /auth/logout`.
+- Student/admin role dependencies and attendance authorization: student self-access only, admin read-only review, and user-bound liveness sessions.
+- `python -m app.auth.cli` for `create-user`, `set-password`, and `deactivate-user`; no public signup.
+- Configurable `AUTH_TOKEN_TTL_SECONDS` (default 3600).
+- Bearer-token authentication in the manual `test_api_attendance.py` client, with password prompt and `ATTENDANCE_API_URL`/`ATTENDANCE_USERNAME` overrides.
+- Runtime tests for login/logout, token expiry/revocation, 401/403 behavior, cross-student denial, session ownership, and account validation (45 focused tests total).
 
 ### Changed
 
@@ -28,8 +35,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Replaced import-time service construction and duplicate model loading with a single lifespan startup path.
 - Made the embedding directory, SQLite path, CORS origins, face threshold, liveness validity, upload limits, image dimensions, and InsightFace cache configurable.
 - Attendance and liveness routes now validate identifiers, sessions, and uploaded images; attendance retrieval returns a controlled database-error response.
-- `get_connection()` now honors `ATTENDANCE_DB_PATH`, and attendance routes use the configured database path from the app state. The FastAPI lifespan now calls `initialize_database()` before constructing model services and marks the database initialized.
-- Updated setup, configuration, architecture, database, testing, roadmap, status, known-issue, and decision documentation with verified runtime behavior.
+- `get_connection()` now honors `ATTENDANCE_DB_PATH`, and attendance routes use the configured database path from the app state. The FastAPI lifespan now calls `initialize_database()` and `initialize_auth_database()` before constructing model services and marks both schemas initialized.
+- Attendance verification now requires a student bearer token, a matching `student_id`, and ownership of the liveness session. Attendance retrieval requires a bearer token and enforces student self-access/admin read-only access.
+- Updated setup, configuration, architecture, database, testing, roadmap, status, known-issue, decision, API, security, and README documentation with authentication behavior and verified runtime results.
 
 ### Repository
 
@@ -38,8 +46,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Known gaps
 
-- No full automated test suite or CI workflow exists (issue #7).
-- No authentication or authorization is implemented (issue #4).
+- No CI workflow exists, and the broader automated test suite is still open (issue #7).
+- TLS, rate limiting, account lockout, MFA/SSO, and audit logging are not implemented.
 - Enrollment/subject authorization is still missing.
+- Liveness session IDs remain in query strings and may be replayed by the same authenticated student within the validity window.
 - Anti-spoofing is heuristic screening, not a trained PAD model.
 - Startup is verified only on macOS arm64 with Python 3.11.16.

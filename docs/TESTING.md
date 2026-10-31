@@ -2,11 +2,11 @@
 
 ## Current status
 
-Focused runtime tests exist under `tests/runtime/`. They cover settings validation, path resolution, the missing-model error, lifespan service wiring with a fake service factory, database initialization, configured database paths, attendance retrieval, duplicate handling, identifier validation, upload limits, and controlled error responses using temporary databases and fake model services. They do not load real models or open a camera.
+Focused runtime tests exist under `tests/runtime/`. They cover settings validation, path resolution, the missing-model error, lifespan service wiring with a fake service factory, database initialization, configured database paths, attendance retrieval, duplicate handling, identifier validation, upload limits, controlled error responses, local account provisioning, Argon2id password verification, bearer-token expiry/revocation, login/logout, role checks, cross-student denial, and liveness-session ownership using temporary databases and fake model services. They do not load real models or open a camera.
 
 The older files named `test_*.py` are still manual scripts that execute top-level code when imported or run. Do not run plain `pytest` against the whole `tests/` directory: collection imports those modules, which can load models, open a camera, exit the process, or require missing fixtures.
 
-Runtime verification of the real liveness and face-recognition camera flow was **not performed**. SQLite schema initialization, retrieval, duplicate handling, input validation, upload limits, and controlled error responses were verified through focused runtime tests without loading real models.
+Runtime verification of the real liveness and face-recognition camera flow was **not performed**. SQLite schema initialization, retrieval, duplicate handling, input validation, upload limits, controlled error responses, authentication, token lifecycle, and authorization were verified through focused runtime tests without loading real models.
 
 ## What was verified
 
@@ -15,8 +15,9 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 | Check | Result | Scope |
 | --- | --- | --- |
 | `python -m compileall -q app tests` | Passed | Syntax/bytecode compilation only. |
-| `python -m pytest tests/runtime -q` | Passed (32 tests) | Settings, lifespan wiring, `/`, `/docs`, missing-model failure, database initialization, retrieval, duplicate handling, validation, upload limits, and controlled errors. |
-| Attendance API with temporary database and fake model services | Passed | Fresh retrieval returns an empty list; repeated insert maps to duplicate response. |
+| `python -m pytest tests/runtime -q` | Passed (45 tests) | Settings, lifespan wiring, `/`, `/docs`, missing-model failure, database initialization, retrieval, duplicate handling, validation, upload limits, controlled errors, authentication, token lifecycle, and authorization. |
+| Attendance API with temporary database and fake model services | Passed | Fresh retrieval returns an empty list; repeated insert maps to duplicate response; unauthenticated requests return `401`; cross-student and wrong-role requests return `403`. |
+| Authentication API with temporary database | Passed | Login, `/auth/me`, logout revocation, expired-token rejection, student self-access, admin read-only access, and session ownership checks. |
 | `python -m uvicorn app.main:app` | Startup complete | Real MediaPipe and InsightFace models loaded once each. |
 | `GET /` and `GET /docs` | `200` | Served after lifespan startup. |
 | Missing `MEDIAPIPE_FACE_LANDMARKER_MODEL` | Startup failed with `RuntimeError` | Names the setting that must be fixed. |
@@ -27,7 +28,7 @@ The compile and test checks do not establish that the same Python version works 
 
 | Script | What it does | Requirements | Current state |
 | --- | --- | --- | --- |
-| `test_api_attendance.py` | Starts a liveness session, opens a webcam, sends frames, waits for a blink, then submits the final frame to `/attendance/verify`. | Running API, webcam, `requests`, OpenCV, registered embedding for `STU001`. | Manual, no assertions; hardcoded student/subject/lecture. |
+| `test_api_attendance.py` | Authenticates, starts a liveness session, opens a webcam, sends frames, waits for a blink, then submits the final frame to `/attendance/verify`. | Running API, provisioned student account, webcam, `requests`, OpenCV, registered embedding for `STU001`. | Manual, no assertions; prompts for a password; hardcoded student/subject/lecture; reads `ATTENDANCE_API_URL` and `ATTENDANCE_USERNAME`. |
 | `test_liveness_service.py` | Older liveness camera script. | Webcam, MediaPipe model. | Broken import: `from liveness import LivenessService`; not runnable as-is. |
 | `tests/services/test_liveness_service.py` | Camera liveness test with anti-spoofing status display. | Webcam, MediaPipe model. | Manual; no assertions. |
 | `tests/services/test_attendance_verification.py` | Full camera liveness + face-recognition flow. | Webcam, MediaPipe + InsightFace models, embedding for `STU001`. | Manual; no assertions. |
@@ -67,12 +68,12 @@ Proposed for Phase 2 of the [roadmap](ROADMAP.md):
 
 1. Unit tests for `compare_faces`, EAR calculation, and anti-spoofing heuristics using synthetic arrays.
 2. Broaden database tests to additional insert, duplicate, and query cases.
-3. Expand API tests with mocked model services to cover session validation, rejection, duplicate, and retrieval.
+3. Expand API tests with mocked model services to cover liveness rejection and the full session state machine.
 4. Liveness state-machine tests using synthetic frames or mocked detectors.
 5. Face-matching tests with synthetic or explicitly consented fixtures; never real student data.
 6. CI workflow that runs tests without a camera or model downloads.
 
-Temporary-database and fake-model-service API/database coverage now exists, including validation and upload rejection cases, but broad coverage is still outstanding ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+Temporary-database and fake-model-service API/database/auth coverage now exists, including validation and upload rejection cases, but broad coverage and CI are still outstanding ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
 
 ## Hardware and test-data requirements
 

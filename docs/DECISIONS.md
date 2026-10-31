@@ -96,7 +96,19 @@ Record significant repository and architecture decisions here. Add new entries r
 - **Status:** Accepted
 - **Context:** Attendance and liveness routes previously accepted unvalidated identifiers and image uploads, could build embedding paths outside the configured directory, and returned raw exception text.
 - **Decision:** Centralize identifier, session, and image validation in `app/services/validation.py`. Enforce configurable upload-size and decoded-image limits, require embedding paths to remain under `FACE_EMBEDDING_DIR`, and return stable client-facing error messages. Catch retrieval database errors in the attendance routes.
-- **Consequences:** Invalid input is rejected before model inference, and limits can be tuned with environment variables. Enrollment/subject authorization and authentication remain separate open work.
+- **Consequences:** Invalid input is rejected before model inference, and limits can be tuned with environment variables. Authentication is addressed by D-013; enrollment/subject authorization remains separate open work.
+
+## D-013 — Local accounts and opaque bearer tokens for access control
+
+- **Date:** 2026-10-31
+- **Status:** Accepted
+- **Context:** Issue [#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4) requires authentication and authorization before any real deployment, but the project has no identity provider, account model, or deployment trust boundary. Implementing a credential scheme without an explicit model would create an unmaintainable security surface.
+- **Decision:** Use local accounts stored in the configured SQLite database. Passwords are hashed with Argon2id (`argon2-cffi`). Authentication issues opaque 256-bit bearer tokens; only SHA-256 token hashes and expiry timestamps are stored. Tokens expire after `AUTH_TOKEN_TTL_SECONDS` (default 3600 seconds) and can be revoked through logout, password reset, or account deactivation.
+- **Roles and authorization:** `student` accounts are linked to one `student_id` and may only start liveness sessions and mark/read their own attendance. `admin` accounts have no `student_id` and may read all attendance records but cannot start liveness sessions or mark attendance. Authentication is required on every endpoint except `GET /`, `POST /auth/token`, and the OpenAPI documentation.
+- **Provisioning:** There is no public signup. Accounts are managed with `python -m app.auth.cli` (`create-user`, `set-password`, `deactivate-user`). Password reset and deactivation revoke all active tokens.
+- **Session binding:** Liveness sessions are bound to the authenticated user ID. A different authenticated student cannot use or submit another user's session.
+- **Threat model covered:** Unauthenticated callers cannot invoke biometric operations or read attendance. A stolen token grants that user's access until expiry or revocation. The design does not protect against a compromised server or database, token theft through insecure transport, password guessing without rate limiting, shared student devices, or compromised admin accounts. TLS, rate limiting, audit logging, and SSO/federated identity remain separate work.
+- **Consequences:** The API now returns HTTP `401` for missing/invalid/expired credentials and HTTP `403` for role or ownership violations. Local account lifecycle and token storage become operational responsibilities. The in-memory liveness store remains single-process, and no multi-worker session sharing exists.
 
 ## Proposed decisions (not yet accepted)
 

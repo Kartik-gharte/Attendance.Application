@@ -1,6 +1,6 @@
 # Known Issues
 
-These are confirmed gaps based on source inspection and repository state as of 2026-10-31. KI-001, KI-002, KI-003, KI-005, KI-007, KI-009, KI-010, and KI-013 are resolved; the remaining issues are still open.
+These are confirmed gaps based on source inspection and repository state as of 2026-10-31. KI-001, KI-002, KI-003, KI-004, KI-005, KI-007, KI-009, KI-010, and KI-013 are resolved; KI-006 is partially resolved; the remaining issues are still open.
 
 Severity is a triage aid, not a formal risk rating.
 
@@ -11,9 +11,9 @@ Severity is a triage aid, not a formal risk rating.
 | KI-001 | Critical | Empty dependency manifest | Resolved |
 | KI-002 | Critical | Hardcoded Windows model path | Resolved |
 | KI-003 | Critical | Database schema is never initialized | Resolved |
-| KI-004 | Critical | No authentication or authorization | Open |
+| KI-004 | Critical | No authentication or authorization | Resolved |
 | KI-005 | High | `student_id` is used in a filesystem path without validation | Resolved |
-| KI-006 | High | Liveness sessions are bearer-like and replayable | Open |
+| KI-006 | High | Liveness sessions are bearer-like and replayable | Partially resolved |
 | KI-007 | High | No upload size/type limits or domain validation | Resolved |
 | KI-008 | High | No automated test suite | Open |
 | KI-009 | High | No configuration system | Resolved |
@@ -57,10 +57,12 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-004 — No authentication or authorization
 
-- **Evidence:** All routes are unauthenticated; there is no auth dependency, token handling, or user model.
-- **Impact:** Anyone who can reach the API can mark attendance, read all records, or probe biometric services. CORS does not prevent non-browser access.
+- **Evidence:** All routes were unauthenticated; there was no auth dependency, token handling, or user model.
+- **Impact:** Anyone who could reach the API could mark attendance, read all records, or probe biometric services. CORS does not prevent non-browser access.
 - **Proposed fix:** Add authentication, role-based authorization, and audited access controls. This is required before any real deployment.
-- **Status:** Open; security blocker.
+- **Resolution:** Local SQLite accounts use Argon2id password hashes and opaque bearer tokens stored as SHA-256 hashes with expiry/revocation. Students can mark/read only their own attendance; admins can read records but cannot mark attendance. Liveness sessions are bound to the authenticated user. Tokens are issued by `POST /auth/token` and accounts are provisioned through `python -m app.auth.cli`. Tests cover login, logout, expiry, revocation, roles, cross-student denial, and session ownership.
+- **Remaining risk:** TLS, rate limiting, account lockout, MFA/SSO, and audit logging are not implemented. See [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md).
+- **Status:** Resolved 2026-10-31 for the local-account baseline.
 
 ### KI-005 — Unvalidated `student_id` in filesystem path
 
@@ -71,10 +73,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-006 — Liveness sessions are replayable and exposed in query strings
 
-- **Evidence:** `session_id` is a UUID stored in a module-level dictionary; `/liveness/frame` accepts it as a query parameter; `/attendance/verify` trusts that a verified session exists. Sessions are not bound to a student or client.
-- **Impact:** A captured session or final image can be replayed within the configured validity window (default 30 seconds). Session IDs may appear in logs.
-- **Proposed fix:** Bind sessions to an authenticated user/student and device context, use headers/body instead of query strings, and add one-time, cryptographic challenge binding.
-- **Status:** Open.
+- **Evidence:** `session_id` is a UUID stored in a module-level dictionary; `/liveness/frame` accepts it as a query parameter; `/attendance/verify` trusts that a verified session exists. Sessions are now bound to the authenticated user ID, but not to a device, IP, or one-time challenge.
+- **Impact:** A captured session may be replayed by the same authenticated student within the configured validity window (default 30 seconds). A different student receives `403`. Session IDs may appear in logs.
+- **Proposed fix:** Use headers/body instead of query strings, add device/request binding, and add a one-time cryptographic challenge.
+- **Status:** Partially resolved; authenticated-user binding is implemented and tested. Replay and query-string exposure remain open.
 
 ### KI-007 — Missing input and upload validation
 
@@ -85,10 +87,10 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-008 — No automated tests
 
-- **Evidence:** `test_*.py` files execute top-level code, open cameras, use `exit()`, and require absent fixtures. No pytest configuration or CI workflow exists.
-- **Impact:** Regressions cannot be detected automatically. Pytest collection may execute dangerous/manual code.
-- **Proposed fix:** Add unit/API/database tests with mocked models and temporary storage; keep model/camera checks separate and opt-in.
-- **Status:** Open; Phase 2 priority.
+- **Evidence:** Focused runtime tests now exist under `tests/runtime/` (45 passing tests) and cover settings, startup, database, validation, authentication, and attendance API behavior with fake model services. Root `test_*.py` files still execute top-level code, open cameras, use `exit()`, and require absent fixtures. No CI workflow exists.
+- **Impact:** The focused suite catches regressions in covered paths, but model/camera scripts remain dangerous to collect and there is no CI enforcement.
+- **Proposed fix:** Keep expanding deterministic tests and add CI; retire or isolate manual scripts.
+- **Status:** Open; focused coverage exists, broader suite and CI remain Phase 2 priority ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
 
 ### KI-009 — No configuration system
 
@@ -114,7 +116,7 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-012 — Per-process, unbounded in-memory sessions
 
-- **Evidence:** `sessions = {}` at `app/api/liveness_routes.py:19`; abandoned sessions are never removed; no shared store or lock.
+- **Evidence:** `sessions = {}` at `app/api/liveness_routes.py`; sessions are now bound to an authenticated user ID, but abandoned sessions are never removed and there is no shared store or lock.
 - **Impact:** Memory growth; behavior differs with multiple workers/restarts; no cross-process verification.
 - **Proposed fix:** Add expiry cleanup and, if scaling, a shared store with lifecycle management.
 - **Status:** Open.

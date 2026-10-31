@@ -73,7 +73,7 @@ Use the imperative mood and a concise subject. Add a body when the reason or tra
   - a focused manual check of the changed flow.
 - Report exactly what was run and what could not be run. Do not claim a test passed unless it was executed.
 
-The current test files are manual scripts, not a pytest suite. See [docs/TESTING.md](docs/TESTING.md).
+Focused runtime tests live under `tests/runtime/`; camera-dependent scripts remain manual. See [docs/TESTING.md](docs/TESTING.md).
 
 ## Documentation
 
