@@ -1,5 +1,7 @@
 import sqlite3
 import time
+from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -7,9 +9,29 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.liveness_routes import sessions
+from app.auth.models import UserPrincipal
+from app.auth.service import (
+    create_user,
+    initialize_auth_database,
+    issue_token,
+)
 from app.core.config import Settings
 from app.core.services import AppServices
 from app.main import create_app
+
+
+TEST_PASSWORD = "test-password-123"
+
+
+@dataclass
+class ApiTestContext:
+    app: object
+    database_path: Path
+    services: AppServices
+    student: UserPrincipal
+    admin: UserPrincipal
+    student_headers: dict[str, str]
+    admin_headers: dict[str, str]
 
 
 class FakeLivenessService:
@@ -88,9 +110,34 @@ def build_test_app(
     max_image_width: int = 4096,
     max_image_height: int = 4096,
     max_image_pixels: int = 16 * 1024 * 1024,
-):
+) -> ApiTestContext:
 
     database_path = tmp_path / "attendance.db"
+
+    initialize_auth_database(database_path)
+
+    student = create_user(
+        "student-test",
+        TEST_PASSWORD,
+        "student",
+        student_id="STU001",
+        database_path=database_path,
+    )
+    admin = create_user(
+        "admin-test",
+        TEST_PASSWORD,
+        "admin",
+        database_path=database_path,
+    )
+
+    student_token, _ = issue_token(
+        student.id,
+        database_path=database_path,
+    )
+    admin_token, _ = issue_token(
+        admin.id,
+        database_path=database_path,
+    )
 
     services = AppServices(
         liveness_service=FakeLivenessService(),
@@ -110,12 +157,28 @@ def build_test_app(
         service_factory=lambda settings: services,
     )
 
-    return app, database_path, services
+    return ApiTestContext(
+        app=app,
+        database_path=database_path,
+        services=services,
+        student=student,
+        admin=admin,
+        student_headers={
+            "Authorization": f"Bearer {student_token}",
+        },
+        admin_headers={
+            "Authorization": f"Bearer {admin_token}",
+        },
+    )
 
-def seed_liveness_session(session_id="123e4567-e89b-42d3-a456-426614174000"):
 
+def seed_liveness_session(
+    user_id,
+    session_id="123e4567-e89b-42d3-a456-426614174000",
+):
 
     sessions[session_id] = {
+        "user_id": user_id,
         "closed_frames": 0,
         "eyes_closed": False,
         "liveness_verified": True,
@@ -128,7 +191,7 @@ def verify_attendance_request(client, session_id="123e4567-e89b-42d3-a456-426614
     return client.post(
         "/attendance/verify",
         data={
-            "student_id": "STU-TEST",
+            "student_id": "STU001",
             "session_id": session_id,
             "subject": "Test Subject",
             "lecture_id": "TEST-LECTURE",
@@ -147,11 +210,11 @@ def test_attendance_rejects_invalid_student_identifier_before_model_inference(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         response = client.post(
             "/attendance/verify",
@@ -173,18 +236,18 @@ def test_attendance_rejects_invalid_student_identifier_before_model_inference(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid student identifier"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_invalid_subject_before_model_inference(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         response = client.post(
             "/attendance/verify",
@@ -206,18 +269,18 @@ def test_attendance_rejects_invalid_subject_before_model_inference(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid subject"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_invalid_lecture_identifier_before_model_inference(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         response = client.post(
             "/attendance/verify",
@@ -239,18 +302,18 @@ def test_attendance_rejects_invalid_lecture_identifier_before_model_inference(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid lecture identifier"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_malformed_image_before_model_inference(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         response = client.post(
             "/attendance/verify",
@@ -272,21 +335,21 @@ def test_attendance_rejects_malformed_image_before_model_inference(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid or unsupported image"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_oversized_image_before_model_inference(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(
+    ctx = build_test_app(
         tmp_path,
         max_upload_size_bytes=16,
     )
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         response = client.post(
             "/attendance/verify",
@@ -308,14 +371,14 @@ def test_attendance_rejects_oversized_image_before_model_inference(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Image exceeds maximum allowed size"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_image_with_excessive_dimensions(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(
+    ctx = build_test_app(
         tmp_path,
         max_upload_size_bytes=1024 * 1024,
         max_image_width=8,
@@ -323,9 +386,9 @@ def test_attendance_rejects_image_with_excessive_dimensions(
         max_image_pixels=64,
     )
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         response = client.post(
             "/attendance/verify",
@@ -347,16 +410,16 @@ def test_attendance_rejects_image_with_excessive_dimensions(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Image dimensions exceed maximum allowed size"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_invalid_session_identifier(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
         response = client.post(
             "/attendance/verify",
@@ -378,16 +441,16 @@ def test_attendance_rejects_invalid_session_identifier(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid liveness session"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_unknown_session(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
         response = client.post(
             "/attendance/verify",
@@ -409,18 +472,18 @@ def test_attendance_rejects_unknown_session(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid or expired liveness session"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_attendance_rejects_invalid_image_content_type(
     tmp_path,
 ):
 
-    app, _, services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         response = client.post(
             "/attendance/verify",
@@ -442,7 +505,7 @@ def test_attendance_rejects_invalid_image_content_type(
     assert response.status_code == 200
     assert response.json()["status"] == "error"
     assert response.json()["message"] == "Invalid or unsupported image"
-    assert services.attendance_service.verify_calls == 0
+    assert ctx.services.attendance_service.verify_calls == 0
 
 
 def test_retrieval_database_error_returns_controlled_error(
@@ -464,11 +527,11 @@ def test_retrieval_database_error_returns_controlled_error(
         _raise,
     )
 
-    app, _, _services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        response = client.get("/attendance/all")
+        response = client.get("/attendance/all", headers=ctx.admin_headers)
 
     assert response.status_code == 200
     assert response.json()["status"] == "error"
@@ -477,11 +540,11 @@ def test_retrieval_database_error_returns_controlled_error(
 
 def test_fresh_database_retrieval_through_api(tmp_path):
 
-    app, database_path, _services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        response = client.get("/attendance/all")
+        response = client.get("/attendance/all", headers=ctx.admin_headers)
 
         assert response.status_code == 200
         assert response.json() == {
@@ -491,13 +554,13 @@ def test_fresh_database_retrieval_through_api(tmp_path):
         }
 
         student_response = client.get(
-            "/attendance/student/STU-TEST"
+            "/attendance/student/STU001"
         )
 
         assert student_response.status_code == 200
         assert student_response.json()["count"] == 0
 
-    with sqlite3.connect(database_path) as connection:
+    with sqlite3.connect(ctx.database_path) as connection:
 
         table = connection.execute(
             """
@@ -513,19 +576,19 @@ def test_fresh_database_retrieval_through_api(tmp_path):
 
 def test_duplicate_attendance_is_mapped_to_duplicate_response(tmp_path):
 
-    app, _, _services = build_test_app(tmp_path)
+    ctx = build_test_app(tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(ctx.app, headers=ctx.student_headers) as client:
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         first = verify_attendance_request(client)
 
-        seed_liveness_session()
+        seed_liveness_session(ctx.student.id)
 
         duplicate = verify_attendance_request(client)
 
-        records = client.get("/attendance/all")
+        records = client.get("/attendance/all", headers=ctx.admin_headers)
 
     assert first.status_code == 200
     assert first.json()["status"] == "success"
@@ -538,4 +601,4 @@ def test_duplicate_attendance_is_mapped_to_duplicate_response(tmp_path):
 
     assert records.status_code == 200
     assert records.json()["count"] == 1
-    assert records.json()["attendance"][0]["student_id"] == "STU-TEST"
+    assert records.json()["attendance"][0]["student_id"] == "STU001"
