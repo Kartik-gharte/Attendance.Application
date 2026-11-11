@@ -37,7 +37,7 @@
 
 | # | Title | Priority | Status |
 |---|---|---|---|
-| #6 | [P1] Harden liveness sessions against replay, leakage, and stale state | High | **In progress** (see PR #26 branch `fix/liveness-session-hardening`). Core hardening implemented: `created_at` TTL from session creation, session consumption tracking (pop after use), user binding to authenticated principal. Remaining: moving `session_id` from query string, multi-worker support, and test coverage for expiry/replay/cross-student scenarios. KI-006 partially resolved; KI-012 partially resolved. |
+| #6 | [P1] Harden liveness sessions against replay, leakage, and stale state | High | **Completed** in PR #26 `fix/liveness-session-hardening` (merged 2026-11-11). `created_at` TTL from session creation, session consumption tracking (pop after use), and user binding to authenticated principal are now part of `main`. Issue closed. KI-006 resolved; KI-012 resolved. |
 | #8 | [P1] Replace print logging with structured, redacted logging | High | **Open**; KI-017. `print()` calls throughout codebase; no log levels, no redaction, no policy for what must not appear in logs. |
 | #10 | [P2] Replace hardcoded enrollment and manual-client scripts with parameterized workflows | Medium | **Open**; KI-014, KI-016, KI-019. Scripts hardcode `STU001`, `test.jpg`, Windows paths; no path validation, no overwrite protection, no CLI parameterization. |
 | #11 | [P2] Evaluate face-recognition accuracy and presentation-attack resistance | Medium | **Open**; KI-020. No benchmark, dataset, FAR/FRR measurements, or anti-spoofing evaluation. Heuristic checks only, not a trained PAD model. |
