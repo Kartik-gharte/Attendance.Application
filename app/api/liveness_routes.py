@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import uuid
 import time
+import logging
 
 from app.auth.dependencies import require_student
 from app.auth.models import UserPrincipal
@@ -22,10 +23,11 @@ from app.services.validation import (
     validate_image_content_type,
     validate_session_id,
 )
-
+from app.core.config import get_settings
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
 
 # =========================================================
 # LIVENESS SESSIONS
@@ -50,7 +52,9 @@ async def start_liveness(
         "closed_frames": 0,
         "eyes_closed": False,
         "liveness_verified": False,
-        "verified_at": None
+        "verified_at": None,
+        "created_at": time.time(),
+        "consumed_at": None
     }
 
     return {
@@ -79,11 +83,17 @@ async def process_liveness_frame(
         settings.liveness_validity_seconds
     )
 
+    # -----------------------------------------------------
+    # VALIDATE SESSION ID AND CHECK TTL FROM CREATION
+    # -----------------------------------------------------
+
     try:
 
         validated_session_id = validate_session_id(session_id)
 
     except ValueError:
+
+        logger.warning("Invalid liveness session ID: %s", session_id)
 
         return {
             "status": "error",
@@ -92,12 +102,42 @@ async def process_liveness_frame(
 
     if validated_session_id != session_id or session_id not in sessions:
 
+        logger.warning("Liveness session not found or ID mismatch: %s", session_id)
+
         return {
             "status": "error",
             "message": "Invalid or expired liveness session"
         }
 
     session = sessions[session_id]
+
+    # Check TTL from creation (not just from verification)
+    created_at = session.get("created_at")
+
+    if created_at is not None and time.time() - created_at > liveness_validity_seconds:
+
+        logger.warning("Liveness session expired by creation TTL: %s", session_id)
+
+        sessions.pop(session_id, None)
+
+        return {
+            "status": "error",
+            "message": "Liveness session expired"
+        }
+
+    # Check that session is not already consumed
+    if session.get("consumed_at") is not None:
+
+        logger.warning("Liveness session already consumed: %s", session_id)
+
+        return {
+            "status": "error",
+            "message": "Liveness session already consumed"
+        }
+
+    # -----------------------------------------------------
+    # CHECK SESSION USER BINDING
+    # -----------------------------------------------------
 
     if session.get("user_id") != current_user.id:
 

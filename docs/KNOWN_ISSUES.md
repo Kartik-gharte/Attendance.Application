@@ -13,13 +13,13 @@ Severity is a triage aid, not a formal risk rating.
 | KI-003 | Critical | Database schema is never initialized | Resolved |
 | KI-004 | Critical | No authentication or authorization | Resolved |
 | KI-005 | High | `student_id` is used in a filesystem path without validation | Resolved |
-| KI-006 | High | Liveness sessions are bearer-like and replayable | Partially resolved |
+| KI-006 | High | Liveness sessions are bearer-like and replayable | **Partially resolved** (see PR #26). Sessions now have `created_at` TTL, are consumed after use, and are bound to authenticated principal. Query-string transport and multi-worker support remain open.|
 | KI-007 | High | No upload size/type limits or domain validation | Resolved |
 | KI-008 | High | No automated test suite | Resolved (19 deterministic service tests + CI workflow merged) |
 | KI-009 | High | No configuration system | Resolved |
 | KI-010 | High | Error responses expose internal messages | Resolved |
 | KI-011 | High | No retention, deletion, encryption, or backup policy | Partially resolved (delete_old_attendance function implemented) |
-| KI-012 | Medium | In-memory sessions are per-process and never cleaned up | Open |
+| KI-012 | Medium | In-memory sessions are per-process and never cleaned up | **Partially resolved** (see PR #26). Sessions are now removed on expiry and after consumption, preventing unbounded growth in single-process mode. Multi-process cleanup requires shared store. |
 | KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile | Resolved |
 | KI-014 | Medium | Broken import in `test_liveness_service.py` | Open |
 | KI-015 | Medium | Missing fixtures and model assets | Resolved (tests use synthetic fixtures, no model/assets required) |

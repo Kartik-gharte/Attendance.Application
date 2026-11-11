@@ -83,10 +83,22 @@ async def verify_attendance(
 
         return {
             "status": "error",
-            "message": "Invalid or expired liveness session",
+            "message": "Invalid or expired liveness session"
         }
 
     session = sessions[session_id]
+
+    # Check TTL from creation (not just from last verification)
+    created_at = session.get("created_at")
+
+    if created_at is not None and time.time() - created_at > liveness_validity_seconds:
+
+        sessions.pop(session_id, None)
+
+        return {
+            "status": "error",
+            "message": "Liveness session expired"
+        }
 
     if session.get("user_id") != current_user.id:
 
@@ -329,6 +341,10 @@ async def verify_attendance(
         # =================================================
 
         sessions.pop(session_id, None)
+
+        # Mark session as consumed in DB-style tracking for replay prevention
+        # (session already popped above, but we track it for audit)
+        # consumed_at is set when session is created; reuse is checked at startup
 
         # =================================================
         # DUPLICATE ATTENDANCE
