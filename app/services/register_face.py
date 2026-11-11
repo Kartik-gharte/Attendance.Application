@@ -1,76 +1,115 @@
+import argparse
 import cv2
 import os
+import sys
 import numpy as np
+from pathlib import Path
+
 from insightface.app import FaceAnalysis
 
-# -----------------------------
-# Student information
-# -----------------------------
+from app.core.config import get_settings
 
-student_id = "STU001"
+DEFAULT_EMBEDDING_DIR = get_settings().embedding_dir
 
-# -----------------------------
-# Load InsightFace
-# -----------------------------
 
-print("Loading InsightFace...")
+def register_face(student_id: str, image_path: str, output_dir: str | None = None,
+                  overwrite: bool = False, dry_run: bool = False) -> str | None:
+    """Register a student's face embedding.
+    
+    Args:
+        student_id: Student identifier (validated against pattern)
+        image_path: Path to source image
+        output_dir: Output directory for .npy file (defaults to configured embedding dir)
+        overwrite: Whether to overwrite existing embedding
+        dry_run: If True, validate everything without writing
+    
+    Returns:
+        Path to saved .npy file, or None on failure
+    """
+    # Validate student identifier
+    import re
+    pattern = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
+    if not pattern.fullmatch(student_id):
+        print(f"ERROR: Invalid student ID '{student_id}'. Must match pattern: {pattern.pattern}")
+        return None
+    
+    # Load source image
+    image = cv2.imread(image_path)
+    if image is None:
+        print(f"ERROR: Could not open image: {image_path}")
+        return None
+    
+    # Detect faces
+    app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+    app.prepare(ctx_id=0, det_size=(640, 640))
+    
+    faces = app.get(image)
+    if len(faces) == 0:
+        print("ERROR: No face detected in image")
+        return None
+    if len(faces) > 1:
+        print("ERROR: More than one face detected in image")
+        return None
+    
+    embedding = faces[0].embedding
+    
+    # Determine output path
+    if output_dir is None:
+        output_dir = str(DEFAULT_EMBEDDING_DIR)
+    
+    output_path = Path(output_dir) / f"{student_id}.npy"
+    output_path = output_path.resolve()
+    
+    # Validate path containment
+    embedding_dir = Path(DEFAULT_EMBEDDING_DIR).resolve()
+    try:
+        output_path.relative_to(embedding_dir)
+    except ValueError:
+        print(f"ERROR: Output path must be within embedding directory {embedding_dir}")
+        return None
+    
+    # Check for existing embedding
+    if output_path.exists() and not overwrite:
+        print(f"ERROR: Embedding already exists at {output_path}. Use --overwrite to replace.")
+        return None
+    
+    if dry_run:
+        print(f"DRY RUN: Would save embedding to {output_path}")
+        print(f"DRY RUN: Embedding length: {len(embedding)}")
+        return None
+    
+    # Save embedding
+    np.save(str(output_path), embedding)
+    print(f"Face registration successful!")
+    print(f"Student ID: {student_id}")
+    print(f"Saved to: {output_path}")
+    return str(output_path)
 
-app = FaceAnalysis(
-    name="buffalo_l",
-    providers=["CPUExecutionProvider"]
-)
 
-app.prepare(ctx_id=0, det_size=(640, 640))
+def main():
+    """CLI entry point for face registration."""
+    parser = argparse.ArgumentParser(description='Register a student face embedding')
+    parser.add_argument('--student-id', required=True,
+                        help='Student identifier (e.g., STU001)')
+    parser.add_argument('--image', required=True,
+                        help='Path to source image file')
+    parser.add_argument('--output-dir', default=None,
+                        help='Output directory for .npy file')
+    parser.add_argument('--overwrite', action='store_true',
+                        help='Overwrite existing embedding')
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Validate without writing')
+    
+    args = parser.parse_args()
+    
+    register_face(
+        student_id=args.student_id,
+        image_path=args.image,
+        output_dir=args.output_dir,
+        overwrite=args.overwrite,
+        dry_run=args.dry_run
+    )
 
-print("InsightFace loaded")
 
-# -----------------------------
-# Load student's image
-# -----------------------------
-
-image = cv2.imread("test.jpg")
-
-if image is None:
-    print("ERROR: Image could not be opened")
-    exit()
-
-# -----------------------------
-# Detect face
-# -----------------------------
-
-faces = app.get(image)
-
-if len(faces) == 0:
-    print("ERROR: No face detected")
-    exit()
-
-if len(faces) > 1:
-    print("ERROR: More than one face detected")
-    exit()
-
-# -----------------------------
-# Get embedding
-# -----------------------------
-
-embedding = faces[0].embedding
-
-print("Face detected")
-print("Embedding length:", len(embedding))
-
-# -----------------------------
-# Create registration folder
-# -----------------------------
-
-os.makedirs("../../data/face_embeddings", exist_ok=True)
-
-# -----------------------------
-# Save embedding
-# -----------------------------
-
-file_path = f"../../data/face_embeddings/{student_id}.npy"
-
-np.save(file_path, embedding)
-
-print("Face registration successful!")
-print("Student ID:", student_id)
-print("Saved to:", file_path)
+if __name__ == "__main__":
+    main()
