@@ -4,7 +4,11 @@ from pathlib import Path
 from insightface.app import FaceAnalysis
 
 from app.core.config import Settings, get_settings
+from app.core.logging_config import get_logger
 from app.services.validation import validate_student_id
+
+
+logger = get_logger("services.face_recognition")
 
 
 class FaceRecognitionService:
@@ -21,7 +25,7 @@ class FaceRecognitionService:
 
         self.threshold = self.settings.face_match_threshold
 
-        print("Loading InsightFace model...")
+        logger.info("Loading InsightFace model")
 
         try:
 
@@ -53,8 +57,8 @@ class FaceRecognitionService:
         except Exception:
             pass
 
-        print("InsightFace model loaded")
-        print("Face Recognition Service ready")
+        logger.info("InsightFace model loaded")
+        logger.info("Face recognition service ready")
 
     # =========================================================
     # GET EMBEDDING FROM IMAGE FILE
@@ -72,10 +76,7 @@ class FaceRecognitionService:
                 "Could not open image"
             )
 
-        print(
-            "Image loaded:",
-            image.shape
-        )
+        logger.debug("Image loaded: shape=%s", image.shape)
 
         return self.get_embedding_from_frame(
             image
@@ -92,9 +93,7 @@ class FaceRecognitionService:
         det_size=(640, 640)
     ):
 
-        print(
-            f"Trying detection: {attempt_name}"
-        )
+        logger.debug("Trying detection strategy: %s", attempt_name)
 
         try:
 
@@ -105,18 +104,21 @@ class FaceRecognitionService:
                 frame
             )
 
-            print(
-                f"Faces detected ({attempt_name}):",
-                len(faces)
+            logger.debug(
+                "Faces detected with strategy %s: count=%d",
+                attempt_name,
+                len(faces),
             )
 
             return faces
 
         except Exception as error:
 
-            print(
-                f"Detection error ({attempt_name}):",
-                str(error)
+            logger.warning(
+                "Detection strategy %s failed: error_type=%s error=%s",
+                attempt_name,
+                type(error).__name__,
+                error,
             )
 
             return []
@@ -172,15 +174,7 @@ class FaceRecognitionService:
                 "Camera frame is empty"
             )
 
-        print()
-        print("======================================")
-        print("INSIGHTFACE FRAME DETECTION")
-        print("======================================")
-
-        print(
-            "Original frame shape:",
-            frame.shape
-        )
+        logger.debug("InsightFace frame detection: shape=%s", frame.shape)
 
         # -----------------------------------------------------
         # Make sure image is uint8
@@ -225,9 +219,7 @@ class FaceRecognitionService:
 
         if embedding is not None:
 
-            print(
-                "Face successfully detected on original frame"
-            )
+            logger.debug("Face detected on original frame")
 
             return embedding
 
@@ -249,10 +241,7 @@ class FaceRecognitionService:
             interpolation=cv2.INTER_CUBIC
         )
 
-        print(
-            "Upscaled frame shape:",
-            upscaled.shape
-        )
+        logger.debug("Upscaled frame shape: %s", upscaled.shape)
 
         faces = self.detect_faces(
             upscaled,
@@ -266,9 +255,7 @@ class FaceRecognitionService:
 
         if embedding is not None:
 
-            print(
-                "Face successfully detected on 2x upscaled frame"
-            )
+            logger.debug("Face detected on 2x upscaled frame")
 
             return embedding
 
@@ -289,9 +276,7 @@ class FaceRecognitionService:
 
         if embedding is not None:
 
-            print(
-                "Face successfully detected with large detector"
-            )
+            logger.debug("Face detected with large detector")
 
             return embedding
 
@@ -300,9 +285,7 @@ class FaceRecognitionService:
         # CONTRAST ENHANCEMENT
         # =====================================================
 
-        print(
-            "Creating contrast-enhanced frame..."
-        )
+        logger.debug("Creating contrast-enhanced frame")
 
         lab = cv2.cvtColor(
             upscaled,
@@ -347,9 +330,7 @@ class FaceRecognitionService:
 
         if embedding is not None:
 
-            print(
-                "Face successfully detected after contrast enhancement"
-            )
+            logger.debug("Face detected after contrast enhancement")
 
             return embedding
 
@@ -358,9 +339,7 @@ class FaceRecognitionService:
         # SHARPEN IMAGE
         # =====================================================
 
-        print(
-            "Creating sharpened frame..."
-        )
+        logger.debug("Creating sharpened frame")
 
         gaussian = cv2.GaussianBlur(
             enhanced,
@@ -388,9 +367,7 @@ class FaceRecognitionService:
 
         if embedding is not None:
 
-            print(
-                "Face successfully detected after sharpening"
-            )
+            logger.debug("Face detected after sharpening")
 
             return embedding
 
@@ -398,25 +375,16 @@ class FaceRecognitionService:
         # NO FACE FOUND
         # =====================================================
 
-        print()
-        print("======================================")
-        print("NO FACE DETECTED")
-        print("======================================")
-
-        print(
-            "Original width:",
-            width
+        logger.info(
+            "No face detected: width=%d height=%d strategies=original,upscale,"
+            "large_detector,contrast,sharpen",
+            width,
+            height,
         )
 
-        print(
-            "Original height:",
-            height
-        )
-
-        print(
-            "Tried:",
-            "original, 2x upscale, large detector,"
-            " contrast enhancement, sharpening"
+        logger.info(
+            "Detection strategies exhausted: original, upscale, large_detector, "
+            "contrast, sharpen"
         )
 
         raise ValueError(
@@ -511,14 +479,10 @@ class FaceRecognitionService:
                 "Registered embedding is empty"
             )
 
-        print(
-            "Registered embedding loaded:",
-            validated_student_id
-        )
-
-        print(
-            "Embedding shape:",
-            embedding.shape
+        logger.debug(
+            "Registered embedding loaded: student_id=%s shape=%s",
+            validated_student_id,
+            embedding.shape,
         )
 
         return embedding
@@ -556,15 +520,7 @@ class FaceRecognitionService:
         student_id
     ):
 
-        print()
-        print("======================================")
-        print("FACE RECOGNITION")
-        print("======================================")
-
-        print(
-            "Recognizing image:",
-            image_path
-        )
+        logger.debug("Face recognition started")
 
         validated_student_id = validate_student_id(
             student_id,
@@ -586,14 +542,10 @@ class FaceRecognitionService:
             new_embedding
         )
 
-        print(
-            "Face similarity:",
-            similarity
-        )
-
-        print(
-            "Face threshold:",
-            self.threshold
+        logger.info(
+            "Face similarity computed: similarity=%s threshold=%s",
+            similarity,
+            self.threshold,
         )
 
         return self.create_recognition_result(
@@ -611,10 +563,7 @@ class FaceRecognitionService:
         student_id
     ):
 
-        print()
-        print("======================================")
-        print("LIVE FACE RECOGNITION")
-        print("======================================")
+        logger.debug("Live face recognition started")
 
         validated_student_id = validate_student_id(
             student_id,
@@ -638,19 +587,11 @@ class FaceRecognitionService:
             new_embedding
         )
 
-        print(
-            "Student ID:",
-            validated_student_id
-        )
-
-        print(
-            "Similarity:",
-            similarity
-        )
-
-        print(
-            "Threshold:",
-            self.threshold
+        logger.info(
+            "Live face comparison: student_id=%s similarity=%s threshold=%s",
+            validated_student_id,
+            similarity,
+            self.threshold,
         )
 
         return self.create_recognition_result(

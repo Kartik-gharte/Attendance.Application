@@ -125,6 +125,18 @@ class Settings(BaseSettings):
         validation_alias="INSIGHTFACE_ROOT",
     )
 
+    log_level: str = Field(
+        default="INFO",
+        validation_alias="LOG_LEVEL",
+        description="Application log level: DEBUG, INFO, WARNING, ERROR, or CRITICAL",
+    )
+
+    log_format: str = Field(
+        default="%(asctime)s %(levelname)s %(name)s %(message)s",
+        validation_alias="LOG_FORMAT",
+        description="logging.Formatter format string for application logs",
+    )
+
     @field_validator(
         "mediapipe_face_landmarker_model",
         "embedding_dir",
@@ -135,6 +147,27 @@ class Settings(BaseSettings):
     @classmethod
     def resolve_paths(cls, value):
         return _resolve_path(value)
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def normalize_log_level(cls, value):
+        if value is None:
+            return "INFO"
+
+        normalized = str(value).strip().upper()
+
+        if normalized not in {
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "ERROR",
+            "CRITICAL",
+        }:
+            raise ValueError(
+                "LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL"
+            )
+
+        return normalized
 
     @property
     def cors_origins(self) -> list[str]:

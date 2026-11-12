@@ -11,7 +11,6 @@ import cv2
 import numpy as np
 import uuid
 import time
-import logging
 
 from app.auth.dependencies import require_student
 from app.auth.models import UserPrincipal
@@ -23,11 +22,11 @@ from app.services.validation import (
     validate_image_content_type,
     validate_session_id,
 )
-from app.core.config import get_settings
+from app.core.logging_config import get_logger
 
 router = APIRouter()
 
-logger = logging.getLogger(__name__)
+logger = get_logger("api.liveness")
 
 # =========================================================
 # LIVENESS SESSIONS

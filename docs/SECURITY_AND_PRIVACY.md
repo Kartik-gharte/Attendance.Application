@@ -113,3 +113,47 @@ Identifier validation, embedding-path containment, upload limits, stable error r
 ## Reporting
 
 See [SECURITY.md](../SECURITY.md). Do not include real biometric data or secrets in a report.
+
+## Logging and redaction
+
+Application logs are a personal-data store. They may contain `student_id`
+values so that an administrator can reconcile attendance records, and they
+must be access-controlled and retained only as long as the operational need
+requires.
+
+The following must never appear in logs at any level, and are masked by the
+redaction filter in `app/core/logging_config.py`:
+
+| Value | Reason |
+| --- | --- |
+| Raw images, video frames, face crops | Biometric data |
+| Face embeddings and `.npy` embedding contents | Biometric data |
+| Bearer tokens, passwords, API keys, secrets | Credential material |
+| Liveness session identifiers | A session is a bearer-like capability |
+| Full multipart request bodies | May contain biometric or credential material |
+
+Redaction is applied when a log record is created, so it protects every
+handler including handlers an operator attaches later. A test captures the
+log stream during a successful attendance attempt and asserts that the
+bearer token, the liveness session identifier, and the account password do
+not appear.
+
+`student_id` is logged at `INFO` level for attendance outcomes only. It is
+never logged together with raw biometric material. Operators who require
+logs without personal identifiers should run at `WARNING` level or above,
+where per-request identifiers are not emitted.
+
+Internal filesystem paths may appear in exception diagnostics at `ERROR`
+level. Operators who require path-free logs should run at `WARNING` level
+or above, where server-side diagnostics are limited to the exception type.
+
+### Retention and access
+
+The application does not write log files and does not implement log
+retention or rotation. Retention, rotation, and access control are the
+responsibility of the process supervisor or container runtime that captures
+stderr. When the service is deployed, configure the runtime with an
+appropriate retention period and restrict access to the log stream.
+
+Logs are not an audit system. They are diagnostic output and do not provide
+tamper-evident records of attendance operations.

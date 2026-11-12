@@ -1,3 +1,5 @@
+import io
+import logging
 import sqlite3
 import time
 from dataclasses import dataclass
@@ -602,3 +604,108 @@ def test_duplicate_attendance_is_mapped_to_duplicate_response(tmp_path):
     assert records.status_code == 200
     assert records.json()["count"] == 1
     assert records.json()["attendance"][0]["student_id"] == "STU001"
+
+
+def test_attendance_flow_logs_do_not_leak_sensitive_values(tmp_path):
+    """A successful attendance attempt must not leak secrets or session IDs."""
+
+    ctx = build_test_app(tmp_path)
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(
+        logging.Formatter("%(levelname)s %(name)s %(message)s")
+    )
+
+    root = logging.getLogger()
+    previous_handlers = list(root.handlers)
+    previous_level = root.level
+
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+    bearer_token = ctx.student_headers["Authorization"].removeprefix("Bearer ")
+    session_id = "123e4567-e89b-42d3-a456-426614174000"
+
+    try:
+
+        with TestClient(ctx.app, headers=ctx.student_headers) as client:
+
+            seed_liveness_session(ctx.student.id)
+
+            response = verify_attendance_request(client)
+
+        assert response.status_code == 200
+
+        output = stream.getvalue()
+
+        # The bearer token must never be written to the log stream.
+        assert bearer_token not in output
+
+        # The liveness session id is a capability and must not be logged.
+        assert session_id not in output
+
+        # The password must never be written to the log stream.
+        assert TEST_PASSWORD not in output
+
+    finally:
+
+        root.removeHandler(handler)
+        root.handlers = previous_handlers
+        root.setLevel(previous_level)
+
+
+def test_rejected_attendance_does_not_leak_internal_error_details(
+    tmp_path,
+    monkeypatch,
+):
+
+    import app.api.routes as attendance_routes
+
+    def _raise(*args, **kwargs):
+
+        raise RuntimeError("internal detail: /secret/path/embedding.npy")
+
+    ctx = build_test_app(tmp_path)
+
+    # The route imports mark_attendance directly, so patch it there.
+    monkeypatch.setattr(
+        attendance_routes,
+        "mark_attendance",
+        _raise,
+    )
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(
+        logging.Formatter("%(levelname)s %(name)s %(message)s")
+    )
+
+    root = logging.getLogger()
+    previous_handlers = list(root.handlers)
+    previous_level = root.level
+
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+    try:
+
+        with TestClient(ctx.app, headers=ctx.student_headers) as client:
+
+            seed_liveness_session(ctx.student.id)
+
+            response = verify_attendance_request(client)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "error"
+        assert response.json()["message"] == "Internal attendance verification error"
+
+        # The client response must not contain the internal detail.
+        assert "internal detail" not in response.json()["message"]
+        assert "/secret/path" not in str(response.json())
+
+    finally:
+
+        root.removeHandler(handler)
+        root.handlers = previous_handlers
+        root.setLevel(previous_level)

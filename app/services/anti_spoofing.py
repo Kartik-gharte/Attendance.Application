@@ -1,6 +1,11 @@
 import cv2
 import numpy as np
 
+from app.core.logging_config import get_logger
+
+
+logger = get_logger("services.anti_spoofing")
+
 
 class AntiSpoofingService:
 
@@ -15,13 +20,13 @@ class AntiSpoofingService:
 
     def __init__(self):
 
-        print("Initializing Anti-Spoofing Service...")
+        logger.info("Initializing anti-spoofing service")
 
         self.MIN_FACE_SIZE = 80
         self.MIN_BRIGHTNESS = 35
         self.MAX_BRIGHTNESS = 235
 
-        print("Anti-Spoofing Service ready")
+        logger.info("Anti-spoofing service ready")
 
     # =========================================================
     # CHECK FRAME
