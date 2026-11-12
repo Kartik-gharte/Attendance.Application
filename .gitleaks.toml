@@ -1,0 +1,17 @@
+# Gitleaks configuration
+#
+# The default rules are extended unchanged. The only relaxation is a scoped
+# path allowlist for the redaction test module, which deliberately supplies
+# credential-shaped input so that the redaction filter can be verified.
+#
+# Those values are local test constants. They are not valid for any service
+# and are never transmitted anywhere.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Deliberate fake credentials used as redaction test inputs"
+paths = [
+    '''tests/runtime/test_logging\.py''',
+]

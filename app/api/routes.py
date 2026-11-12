@@ -13,6 +13,7 @@ import os
 import time
 
 from app.api.liveness_routes import sessions
+from app.core.logging_config import get_logger
 from app.auth.dependencies import (
     get_current_user,
     require_admin,
@@ -42,6 +43,8 @@ from app.database.attendance_db import (
 
 
 router = APIRouter()
+
+logger = get_logger("api.routes")
 
 
 # =========================================================
@@ -256,16 +259,13 @@ async def verify_attendance(
         # LOG REQUEST
         # =================================================
 
-        print()
-        print("======================================")
-        print("ATTENDANCE FACE VERIFICATION")
-        print("======================================")
-        print("Student ID:", student_id)
-        print("Subject:", subject)
-        print("Lecture ID:", lecture_id)
-        print("Image:", image.filename)
-        print("Image size:", len(image_bytes), "bytes")
-        print()
+        logger.info(
+            "Attendance verification requested: student=%s subject=%s lecture=%s image_bytes=%d",
+            validated_student_id,
+            validated_subject,
+            validated_lecture_id,
+            len(image_bytes),
+        )
 
         # =================================================
         # FACE VERIFICATION
@@ -276,9 +276,12 @@ async def verify_attendance(
             validated_student_id
         )
 
-        print("Face result:")
-        print(face_result)
-        print()
+        logger.info(
+            "Face verification completed: result=%s similarity=%s threshold=%s",
+            face_result.get("result"),
+            face_result.get("similarity"),
+            face_result.get("threshold"),
+        )
 
         # =================================================
         # CREATE FINAL RESULT
@@ -290,9 +293,12 @@ async def verify_attendance(
             face_result=face_result
         )
 
-        print("Final attendance result:")
-        print(result)
-        print()
+        logger.info(
+            "Attendance decision computed: liveness=%s face=%s status=%s",
+            result.get("liveness"),
+            result.get("face"),
+            result.get("attendance"),
+        )
 
         # =================================================
         # CHECK FACE VERIFICATION
@@ -329,12 +335,11 @@ async def verify_attendance(
             database_path=request.app.state.settings.database_path
         )
 
-        print("======================================")
-        print("ATTENDANCE DATABASE RESULT")
-        print("======================================")
-        print(attendance_record)
-        print("======================================")
-        print()
+        logger.info(
+            "Attendance record written: duplicate=%s status=%s",
+            attendance_record.get("duplicate", False),
+            attendance_record.get("attendance_status"),
+        )
 
         # =================================================
         # CONSUME LIVENESS SESSION
@@ -403,14 +408,11 @@ async def verify_attendance(
 
     except Exception as error:
 
-        print()
-        print("======================================")
-        print("ATTENDANCE VERIFICATION ERROR")
-        print("======================================")
-        print(type(error).__name__)
-        print(str(error))
-        print("======================================")
-        print()
+        logger.error(
+            "Attendance verification failed: error_type=%s error=%s",
+            type(error).__name__,
+            error,
+        )
 
         return {
             "status": "error",

@@ -1,5 +1,9 @@
+from app.core.logging_config import get_logger
 from app.services.liveness import LivenessService
 from app.services.face_recognition import FaceRecognitionService
+
+
+logger = get_logger("services.attendance_verification")
 
 
 class AttendanceVerificationService:
@@ -10,7 +14,7 @@ class AttendanceVerificationService:
         face_service=None
     ):
 
-        print("Initializing Attendance Verification Service...")
+        logger.info("Initializing attendance verification service")
 
         self.liveness_service = (
             liveness_service
@@ -24,7 +28,7 @@ class AttendanceVerificationService:
             else FaceRecognitionService()
         )
 
-        print("Attendance Verification Service ready")
+        logger.info("Attendance verification service ready")
 
     # =========================================================
     # VERIFY FACE FROM IMAGE
@@ -36,10 +40,7 @@ class AttendanceVerificationService:
         student_id
     ):
 
-        print()
-        print("======================================")
-        print("        FACE VERIFICATION")
-        print("======================================")
+        logger.info("Starting face verification")
 
         try:
 
@@ -52,7 +53,7 @@ class AttendanceVerificationService:
 
         except ValueError as error:
 
-            print("Face verification ValueError:", error)
+            logger.warning("Face verification rejected the input: error=%s", error)
 
             return {
                 "result": "NO_FACE",
@@ -63,7 +64,7 @@ class AttendanceVerificationService:
 
         except Exception as error:
 
-            print("Face verification error:", error)
+            logger.error("Face verification failed: error_type=%s error=%s", type(error).__name__, error)
 
             return {
                 "result": "ERROR",
@@ -82,10 +83,7 @@ class AttendanceVerificationService:
         student_id
     ):
 
-        print()
-        print("======================================")
-        print("    LIVE FACE VERIFICATION")
-        print("======================================")
+        logger.info("Starting live face verification")
 
         try:
 
@@ -98,7 +96,7 @@ class AttendanceVerificationService:
 
         except ValueError as error:
 
-            print("Face verification ValueError:", error)
+            logger.warning("Face verification rejected the input: error=%s", error)
 
             return {
                 "result": "NO_FACE",
@@ -109,7 +107,7 @@ class AttendanceVerificationService:
 
         except Exception as error:
 
-            print("Face verification error:", error)
+            logger.error("Face verification failed: error_type=%s error=%s", type(error).__name__, error)
 
             return {
                 "result": "ERROR",

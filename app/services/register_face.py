@@ -8,6 +8,9 @@ from pathlib import Path
 from insightface.app import FaceAnalysis
 
 from app.core.config import get_settings
+from app.core.logging_config import get_logger
+
+logger = get_logger("services.register_face")
 
 DEFAULT_EMBEDDING_DIR = get_settings().embedding_dir
 
@@ -30,13 +33,13 @@ def register_face(student_id: str, image_path: str, output_dir: str | None = Non
     import re
     pattern = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
     if not pattern.fullmatch(student_id):
-        print(f"ERROR: Invalid student ID '{student_id}'. Must match pattern: {pattern.pattern}")
+        logger.error("Invalid student identifier rejected: %s", student_id)
         return None
     
     # Load source image
     image = cv2.imread(image_path)
     if image is None:
-        print(f"ERROR: Could not open image: {image_path}")
+        logger.error("Source image could not be opened: %s", image_path)
         return None
     
     # Detect faces
@@ -45,10 +48,10 @@ def register_face(student_id: str, image_path: str, output_dir: str | None = Non
     
     faces = app.get(image)
     if len(faces) == 0:
-        print("ERROR: No face detected in image")
+        logger.error("Enrollment aborted: no face detected in the source image")
         return None
     if len(faces) > 1:
-        print("ERROR: More than one face detected in image")
+        logger.error("Enrollment aborted: more than one face detected in the source image")
         return None
     
     embedding = faces[0].embedding
@@ -65,24 +68,24 @@ def register_face(student_id: str, image_path: str, output_dir: str | None = Non
     try:
         output_path.relative_to(embedding_dir)
     except ValueError:
-        print(f"ERROR: Output path must be within embedding directory {embedding_dir}")
+        logger.error("Enrollment aborted: output path escapes the embedding directory")
         return None
     
     # Check for existing embedding
     if output_path.exists() and not overwrite:
-        print(f"ERROR: Embedding already exists at {output_path}. Use --overwrite to replace.")
+        logger.error("Enrollment refused: an embedding already exists for this student")
         return None
     
     if dry_run:
-        print(f"DRY RUN: Would save embedding to {output_path}")
-        print(f"DRY RUN: Embedding length: {len(embedding)}")
+        logger.info("Dry run: would write the embedding for student_id=%s", student_id)
+        logger.info("Dry run: embedding vector length=%d", len(embedding))
         return None
     
     # Save embedding
     np.save(str(output_path), embedding)
-    print(f"Face registration successful!")
-    print(f"Student ID: {student_id}")
-    print(f"Saved to: {output_path}")
+    logger.info("Face registration completed: student_id=%s", student_id)
+    logger.info("Registered student identifier: %s", student_id)
+    logger.info("Embedding stored in the configured embedding directory")
     return str(output_path)
 
 

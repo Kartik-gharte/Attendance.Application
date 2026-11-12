@@ -126,3 +126,45 @@ Runtime dependencies are pinned in `requirements.txt`; development dependencies 
 - A trained presentation-attack detection component, subject to evaluation.
 
 Do not describe any proposed item as implemented until code and tests support it.
+
+## Logging flow
+
+Logging is configured once, during the FastAPI lifespan in `app/main.py`, by
+`configure_logging()` in `app/core/logging_config.py`.
+
+```
+startup
+  -> configure_logging(settings)
+       -> install RedactingLogRecordFactory
+       -> attach stderr handler with RedactingFilter
+       -> set application level from LOG_LEVEL
+  -> module-level loggers (logging.getLogger("attendance.<component>"))
+  -> request handling
+       -> logger.info / logger.warning / logger.error
+       -> record created -> message redacted
+       -> handler formats -> stderr
+```
+
+Every module obtains its logger through `get_logger("<component>")`, which
+places it under the `attendance` namespace. The factory redacts the rendered
+message at record creation, so a handler attached later by an operator still
+receives sanitized values.
+
+Component loggers:
+
+| Logger name | Module | Purpose |
+| --- | --- | --- |
+| `attendance.api.routes` | `app/api/routes.py` | Attendance verification outcomes and errors |
+| `attendance.api.liveness` | `app/api/liveness_routes.py` | Liveness session lifecycle events |
+| `attendance.services.liveness` | `app/services/liveness.py` | MediaPipe model readiness |
+| `attendance.services.face_recognition` | `app/services/face_recognition.py` | InsightFace readiness and similarity scores |
+| `attendance.services.anti_spoofing` | `app/services/anti_spoofing.py` | Screening service readiness |
+| `attendance.services.attendance_verification` | `app/services/attendance_verification.py` | Verification decisions |
+| `attendance.services.register_face` | `app/services/register_face.py` | Enrollment outcomes |
+| `attendance.services.recognize_face` | `app/services/recognize_face.py` | Recognition outcomes |
+| `attendance.auth.cli` | `app/auth/cli.py` | Account provisioning failures |
+
+The only remaining `print()` calls in `app/` are the user-facing confirmation
+messages printed by `app/auth/cli.py`. Those are the intended CLI output
+interface rather than operational log events, and they are covered by a test
+that asserts no other module prints to stdout.

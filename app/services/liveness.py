@@ -8,7 +8,11 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 from app.core.config import get_settings
+from app.core.logging_config import get_logger
 from app.services.anti_spoofing import AntiSpoofingService
+
+
+logger = get_logger("services.liveness")
 
 
 class LivenessService:
@@ -31,7 +35,7 @@ class LivenessService:
                 "of a valid face_landmarker.task file."
             )
 
-        print("Loading MediaPipe Face Landmarker...")
+        logger.info("Loading MediaPipe Face Landmarker")
 
         try:
 
@@ -64,8 +68,8 @@ class LivenessService:
 
         self.anti_spoofing = AntiSpoofingService()
 
-        print("MediaPipe Face Landmarker loaded")
-        print("Liveness Service ready")
+        logger.info("MediaPipe Face Landmarker loaded")
+        logger.info("Liveness service ready")
 
     # =====================================================
     # RELEASE NATIVE RESOURCES
