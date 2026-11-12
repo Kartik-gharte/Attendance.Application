@@ -80,3 +80,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `app/database/backup.py` with backup creation, verification, and restore for the attendance database and the face embeddings. The database copy uses the SQLite online backup API so it is consistent while the service runs. Each backup carries a manifest with the schema version, the SHA-256 checksum of the database, and the list of embedding files.
 - `python -m app.database.backup create`, `list`, `verify`, and `restore`.
 - `tests/runtime/test_database_backup.py` covering backup creation, manifest contents, verification refusals, restore, the overwrite refusal, the safety copy, embedding restore, and data integrity after a restore.
+
+### Added
+- `GET /health/live` reports whether the process is alive. It inspects nothing outside the process, so a dependency outage cannot cause a restart loop.
+- `GET /health/ready` reports whether the service can serve requests. It verifies that the database exists, passes the SQLite integrity check, contains the attendance table, and is at the expected schema version, and that the biometric models are loaded. It returns `503` when the service is not ready.
+- `tests/runtime/test_health_endpoints.py` covering the liveness and readiness behaviour, the dependency failure paths, and the absence of personal data, credentials, and filesystem paths in the responses.

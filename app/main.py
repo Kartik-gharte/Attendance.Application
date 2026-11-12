@@ -4,6 +4,7 @@ from typing import Callable
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.health_routes import router as health_router
 from app.api.liveness_routes import router as liveness_router
 from app.api.routes import router
 from app.auth.routes import router as auth_router
@@ -66,6 +67,7 @@ def create_app(
     application.include_router(router)
     application.include_router(liveness_router)
     application.include_router(auth_router)
+    application.include_router(health_router)
 
     @application.get("/")
     def root():

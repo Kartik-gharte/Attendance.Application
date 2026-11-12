@@ -237,3 +237,36 @@ then fails would otherwise leave the table behind.
 Schema definitions live in `app/database/migrations.py`. The attendance
 table definition moved out of `app/database/attendance_db.py` so that the
 schema has a single source of truth.
+
+## Health and readiness
+
+Two endpoints answer two different operational questions.
+
+| Endpoint | Question | Failure means | Status code |
+| --- | --- | --- | --- |
+| `GET /health/live` | Is the process running? | Restart the process | `200` while alive |
+| `GET /health/ready` | Can the service serve requests? | Take the instance out of rotation | `503` when not ready |
+
+The liveness check deliberately inspects nothing outside the process. It
+does not touch the database or the models, so a dependency outage can never
+cause a restart loop.
+
+The readiness check verifies the database and the biometric models:
+
+```
+build_readiness_report(request)
+  -> check_database(database_path)
+       -> the file exists
+       -> PRAGMA integrity_check returns "ok"
+       -> the attendance table exists
+       -> the schema version matches the expected version
+  -> check_models(request)
+       -> the liveness service and the face service exist
+       -> the MediaPipe detector and the InsightFace analyzer are loaded
+  -> status "ok" when every check passed, otherwise "not_ready"
+```
+
+The endpoints are unauthenticated so that a supervisor or a load balancer
+can reach them. They expose only operational status. A test asserts that
+no student identifier, subject, lecture identifier, credential, database
+path, or embedding directory appears in the responses.

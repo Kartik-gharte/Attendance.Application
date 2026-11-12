@@ -463,3 +463,82 @@ Returns all attendance records, newest first by date and time.
 - The final attendance image is not cryptographically bound to the liveness frames.
 - `student_id`, `subject`, and `lecture_id` are validated before use, and uploaded images are size- and dimension-checked before model inference.
 - Error messages are stable client-facing responses and do not include raw exception details; server-side logs may contain operational details.
+
+## Health and readiness
+
+These endpoints are unauthenticated so that a process supervisor or a load
+balancer can reach them without credentials. They expose only operational
+status and never personal data, credentials, or filesystem paths.
+
+### `GET /health/live`
+
+Reports whether the process is alive and able to serve requests.
+
+A failure of this check means the process should be **restarted**. It does
+not inspect the database or the models, so a dependency outage never causes
+a restart loop.
+
+```json
+{
+  "status": "ok",
+  "checks": {
+    "process": {
+      "alive": true,
+      "detail": "The application process is running"
+    }
+  }
+}
+```
+
+Always returns `200` while the process can answer.
+
+### `GET /health/ready`
+
+Reports whether the service can serve real requests.
+
+A failure of this check means the instance should be **taken out of
+rotation**, not restarted. It returns `503` when a dependency is not ready.
+
+```json
+{
+  "status": "ok",
+  "checks": {
+    "database": {
+      "reachable": true,
+      "schema_version": 1,
+      "expected_schema_version": 1,
+      "detail": null
+    },
+    "models": {
+      "loaded": true,
+      "detail": null
+    }
+  }
+}
+```
+
+When the service is not ready:
+
+```json
+{
+  "status": "not_ready",
+  "checks": {
+    "database": {
+      "reachable": false,
+      "schema_version": null,
+      "expected_schema_version": 1,
+      "detail": "The database file does not exist"
+    },
+    "models": {
+      "loaded": true,
+      "detail": null
+    }
+  }
+}
+```
+
+The database check verifies that the file exists, that it passes the
+SQLite integrity check, that it contains the `attendance` table, and that
+its schema version matches the version the application expects. A database
+that is behind the expected version is reported as not ready, because
+pending migrations must be applied.
