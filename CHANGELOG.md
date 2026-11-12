@@ -85,3 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `GET /health/live` reports whether the process is alive. It inspects nothing outside the process, so a dependency outage cannot cause a restart loop.
 - `GET /health/ready` reports whether the service can serve requests. It verifies that the database exists, passes the SQLite integrity check, contains the attendance table, and is at the expected schema version, and that the biometric models are loaded. It returns `503` when the service is not ready.
 - `tests/runtime/test_health_endpoints.py` covering the liveness and readiness behaviour, the dependency failure paths, and the absence of personal data, credentials, and filesystem paths in the responses.
+
+### Added
+- `docs/DEPLOYMENT.md` describing the requirements, the single-worker constraint for the in-memory liveness sessions, the TLS expectation, the health probe configuration, the measured baseline, and a runbook covering deploying, backing up, upgrading, rolling back, and diagnosing failures.
+- `manual/benchmark.py` measuring the import time, the resident memory, the startup cost, the request latency, and the throughput under concurrency. The measurement is reproducible with `python -m manual.benchmark`.

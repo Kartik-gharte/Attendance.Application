@@ -18,6 +18,7 @@ This directory contains the authoritative project documentation. Source code rem
 
 - [Setup](SETUP.md) — verified install/startup workflow, model provisioning, and remaining blockers.
 - [Configuration](CONFIGURATION.md) — environment variables, defaults, path resolution, and startup behavior.
+- [Deployment](DEPLOYMENT.md) — requirements, worker count constraint, health probes, measured baseline, and the runbook.
 
 ## Testing and security
 

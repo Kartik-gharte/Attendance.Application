@@ -31,8 +31,8 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 - [x] Verify startup, `/`, and `/docs`; document the tested platform and versions.
 - [x] Call database initialization during application startup ([#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3)).
 - [x] Validate `student_id` and constrain the embedding path ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
-- [ ] Fix or remove the broken `test_liveness_service.py` import ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
-- [ ] Make registration output paths project-relative and parameterized ([#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10)).
+- [x] Fix or remove the broken `test_liveness_service.py` import ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+- [x] Make registration output paths project-relative and parameterized ([#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10)).
 - [ ] Verify one consented end-to-end flow.
 
 **Exit criteria:** a fresh environment following [SETUP.md](SETUP.md) starts successfully and the verified commands/values are documented.
@@ -41,11 +41,11 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 **Goal:** make regressions visible without a camera or real biometric data.
 
-- Add pytest-compatible tests for EAR, similarity comparison, anti-spoofing heuristics, and database behavior.
-- Add API tests with mocked model services and a temporary database.
-- Replace `print()` with structured, redacted logging.
-- Add CI for syntax checks, tests, and secret scanning.
-- Document a test-data policy using synthetic or explicitly consented fixtures.
+- [x] Add pytest-compatible tests for EAR, similarity comparison, anti-spoofing heuristics, and database behavior.
+- [x] Add API tests with mocked model services and a temporary database.
+- [x] Replace `print()` with structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).
+- [x] Add CI for syntax checks, tests, and secret scanning.
+- [x] Document a test-data policy using synthetic or explicitly consented fixtures.
 
 **Exit criteria:** CI runs deterministic tests on every pull request, with no camera/model downloads required.
 
@@ -68,11 +68,12 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 **Goal:** support controlled deployment.
 
-- Add schema migrations and backup/restore procedures.
-- Add health/readiness checks and deployment configuration.
-- Define monitoring, audit logging, incident response, and data-retention operations.
-- Complete an institutional privacy/legal review for the target jurisdiction.
-- Load-test and document capacity limits.
+- [x] Add schema migrations and backup/restore procedures ([#12](https://github.com/Kartik-gharte/Attendance.Application/issues/12)).
+- [x] Add health/readiness checks and deployment configuration ([#12](https://github.com/Kartik-gharte/Attendance.Application/issues/12)).
+- [x] Document the single-worker constraint, the measured baseline, and the runbook in [DEPLOYMENT.md](DEPLOYMENT.md).
+- [ ] Define monitoring, audit logging, incident response, and data-retention operations.
+- [ ] Complete an institutional privacy/legal review for the target jurisdiction.
+- [ ] Load-test the attendance verification path with real model assets and record the limits.
 
 **Exit criteria:** a reviewed deployment runbook exists and the system is deployable without undocumented manual steps.
 
