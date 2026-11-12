@@ -1,155 +1,102 @@
 # Issue Backlog — Prioritized Execution Queue
 
-## Execution Order
+**As of:** 2026-11-12
 
-Issues are ordered by priority (P0 > P1 > P2) and within priority by dependency order and estimated effort. Work begins at the top of the queue.
-
----
-
-### P1 — High Priority (2 issues)
-
-#### #6 — Harden liveness sessions against replay, leakage, and stale state
-
-- **Priority:** P1 (High)
-- **Related KI:** KI-006, KI-012
-- **Status:** Open — sessions are module-level dict, bearer-like, replayable
-- **Dependencies:** Requires authentication (issue #4 / PR #20 already merged — Argon2id accounts, bearer tokens, role-based access exist). Session binding to authenticated principal is the next step.
-- **Acceptance criteria:**
-  - [ ] Every session has a documented TTL from creation, even if liveness is never verified.
-  - [ ] Expired sessions are rejected and removed; abandoned sessions do not grow memory without bound.
-  - [ ] A session can be used only by the authenticated student/principal it was created for.
-  - [ ] A session is consumed exactly once.
-  - [ ] Replaying a used or expired session is rejected.
-  - [ ] `session_id` does not appear in URL query strings or access logs.
-  - [ ] Multi-worker behavior is either supported through a shared store or explicitly documented as unsupported.
-  - [ ] Tests cover expiry, replay, cross-student use, cleanup, and malformed session IDs.
-  - [ ] API reference, architecture, security/privacy, and changelog document the new behavior and any breaking change.
-- **Required implementation:**
-  - Add `created_at`, `verified_at`, `consumed_at` fields to session record
-  - Add TTL expiry check from session creation (not just from verification)
-  - Bind session to `current_user.id` (already partially done) + student ID validation
-  - Move `session_id` from query string to header/body
-  - Add replay/consume tracking (single-use)
-  - Add cleanup of expired/abandoned sessions
-  - Add tests for expiry, replay, cross-student use, cleanup, malformed IDs
-  - Document API contract change (breaking: session_id transport)
-- **Proposed branch:** `fix/liveness-session-hardening`
-- **Next action:** Create feature branch from `main` and implement session lifecycle
-
-#### #8 — Replace print logging with structured, redacted logging
-
-- **Priority:** P1 (High)
-- **Related KI:** KI-017
-- **Status:** Open — `print()` calls throughout codebase; no log levels, no redaction
-- **Dependencies:** No blocking dependencies; can start independently.
-- **Acceptance criteria:**
-  - [ ] Application code uses the logging module or an approved structured logger, not `print()` for operational events.
-  - [ ] Log levels are configurable and documented.
-  - [ ] No raw images, embeddings, session IDs, tokens, passwords, or secrets appear in logs.
-  - [ ] Client-facing errors remain sanitized while internal details are logged with redaction.
-  - [ ] A test inspects captured logs for forbidden values.
-  - [ ] Log retention/rotation/access expectations are documented.
-  - [ ] `docs/CONFIGURATION.md`, `docs/SECURITY_AND_PRIVACY.md`, and `docs/ARCHITECTURE.md` are updated.
-  - [ ] KI-017 is closed only after verification.
-- **Required implementation:**
-  - Configure logging once at application startup in `app/main.py`
-  - Replace `print()` calls with `logging` module at appropriate levels
-  - Define redaction policy: no raw images, embeddings, session IDs, tokens, passwords, secrets, full exception strings
-  - Add request correlation if practical
-  - Update all `print()` calls in `app/api/routes.py`, `app/api/liveness_routes.py`, `app/services/*.py`
-  - Add tests that assert sensitive values do not appear in captured logs
-  - Document log retention/rotation/access in `docs/SECURITY_AND_PRIVACY.md`
-- **Proposed branch:** `fix/structured-logging`
-- **Next action:** Create feature branch and replace print statements with structured logging
+All twelve tracked issues have been worked. Ten are complete and merged.
+This document records what remains and what would be done next.
 
 ---
 
-### P2 — Medium Priority (3 issues)
+## Remaining Work
 
-#### #10 — Replace hardcoded enrollment and manual-client scripts with parameterized workflows
-
-- **Priority:** P2 (Medium)
-- **Related KI:** KI-014, KI-016, KI-019
-- **Status:** Open — Scripts hardcode `STU001`, `test.jpg`, Windows paths; no path validation, no overwrite protection
-- **Dependencies:** Enrollment writes biometric data; should depend on authentication/authorization if becoming an API, but CLI-only path is acceptable for now.
-- **Acceptance criteria:**
-  - [ ] No hardcoded student ID, image name, output path, or API URL remains in the enrollment/client workflow.
-  - [ ] The output path is validated and cannot escape the configured embeddings directory.
-  - [ ] Existing embeddings are not overwritten without an explicit flag.
-  - [ ] Failed enrollment does not leave a partial embedding file.
-  - [ ] The source image is validated and must contain exactly one face before writing.
-  - [ ] The command exits nonzero with a clear message on validation or model failure.
-  - [ ] Manual client values are configurable and documented.
-  - [ ] Tests cover valid enrollment, invalid ID/path, multiple/no faces (mocked), and overwrite refusal.
-  - [ ] `docs/SETUP.md`, `docs/CONFIGURATION.md`, `docs/ARCHITECTURE.md`, `docs/KNOWN_ISSUES.md`, and `CHANGELOG.md` are updated.
-- **Required implementation:**
-  - Parameterize `app/services/register_face.py` with CLI args: `--student-id`, `--image`, `--output-dir`, `--dry-run`, `--force`
-  - Validate student identifier against `STUDENT_ID_PATTERN` and path containment under embeddings dir
-  - Write atomically (temp file + rename); refuse to overwrite existing by default
-  - Validate source image has exactly one detectable face
-  - Refactor `app/services/recognize_face.py` to accept parameters instead of hardcoding
-  - Parameterize `test_api_attendance.py` values via env vars or CLI
-  - Add deterministic tests for path validation, overwrite refusal, multi-face refusal
-  - Update documentation
-- **Proposed branch:** `feat/enrollment-workflow`
-- **Next action:** Create feature branch and parameterize enrollment scripts
+### P2 — Medium Priority (2 items)
 
 #### #11 — Evaluate face-recognition accuracy and presentation-attack resistance
 
 - **Priority:** P2 (Medium)
-- **Related KI:** KI-020
-- **Status:** Open — No benchmark, dataset, FAR/FRR measurements, or anti-spoofing evaluation. Heuristic checks only.
-- **Dependencies:** Model assets (MediaPipe + InsightFace) must be available; this work is blocked until model provisioning is verified. See KNOWN_ISSUES.md.
-- **Acceptance criteria:**
-  - [ ] Documented evaluation protocol with attack dataset.
-  - [ ] Measured FAR/FRR or published limitations of current heuristic checks.
-  - [ ] If a trained PAD model is added, it must be optional/configurable and not commit biometric data.
-  - [ ] `docs/SECURITY_AND_PRIVACY.md` updated with evaluation results and limitations.
-- **Required implementation:**
-  - Document current heuristic anti-spoofing checks (size, brightness, Laplacian variance) with known limitations.
-  - If model assets available, run benchmarks against synthetic and real attack data.
-  - Publish measured FAR/FRR or explicitly state that effectiveness is unmeasured.
-  - Update `docs/SECURITY_AND_PRIVACY.md` and `docs/KNOWN_ISSUES.md` (KI-020).
-- **Proposed branch:** `test/face-recognition-evaluation`
-- **Next action:** Verify model assets exist, then document current heuristic limitations; if assets unavailable, document as known gap.
+- **Related KI:** KI-020 (partially resolved)
+- **Status:** Partially completed. The measurement machinery is merged in PR #35.
+- **Delivered:**
+  - `app/evaluation/harness.py` — a versioned dataset description, dataset validation, per-attempt scores and decisions, false accept and false reject rates, a ROC curve, the equal error rate, the liveness success rate, and Wilson score intervals.
+  - `app/evaluation/evaluate.py` — runs the evaluation against the real models and writes a report with no biometric material.
+  - `docs/EVALUATION_DATASET_POLICY.md` — the dataset requirements, the consent rules, the description format, and what may not be claimed until the evaluation has been run.
+  - `tests/runtime/test_evaluation_harness.py` — 26 tests.
+- **Acceptance criteria still open:**
+  - [ ] A consented or licensed dataset exists and passes the dataset validation.
+  - [ ] The evaluation has been run and the report reviewed.
+  - [ ] FAR/FRR, ROC/EER, and the liveness success rate are published with their intervals.
+  - [ ] The heuristic screening has been evaluated against the presentation attacks.
+  - [ ] A threshold recommendation is made, only if the evidence supports one.
+  - [ ] The limitations and the dataset gaps are documented.
+- **Dependencies:** A consenting participant set. The biometric model assets are **not** a dependency; they are provisioned and load correctly.
+- **Testing requirements:** The evaluation harness is already covered by the runtime suite. Any new measurement must come from the harness, so that it is reproducible and carries its uncertainty.
+- **Proposed branch:** `feat/evaluation-run`
+- **Next action:** Assemble a consented dataset that meets `docs/EVALUATION_DATASET_POLICY.md`, then run `python -m app.evaluation.evaluate --dataset <path> --output <path>`.
 
-#### #12 — Add database migrations, backup/restore, health checks, and deployment baseline
+#### #13 — [Tracking] Stabilization backlog: runtime, security, tests, and operations
 
 - **Priority:** P2 (Medium)
-- **Status:** Open — No migration tooling, no backup policy, no health checks.
-- **Dependencies:** Can start independently; depends on SQLite schema being stable (already verified via lifespan).
-- **Acceptance criteria:**
-  - [ ] Database migration tooling (e.g., Alembic or custom schema versioning) is available.
-  - [ ] Backup mechanism for the attendance database.
-  - [ ] Health check endpoint or script.
-  - [ ] Deployment baseline documented.
-- **Required implementation:**
-  - Add Alembic or lightweight migration script for attendance schema evolution.
-  - Add `backup_attendance_db()` function or script.
-  - Add health check route or script that verifies database accessibility and schema version.
-  - Document deployment baseline in `docs/DEPLOYMENT.md` or update `docs/SETUP.md`.
-- **Proposed branch:** `test/database-migrations`
-- **Next action:** Create lightweight migration and backup utilities.
+- **Status:** Metadata tracking issue. Its contents are now covered by the documentation set.
+- **Acceptance criteria:** None of its own. It closes when the items it tracks are closed.
+- **Dependencies:** Depends on #11 being resolved, because the accuracy evaluation is the last unaddressed item in its scope.
+- **Testing requirements:** None.
+- **Proposed branch:** None. It is a metadata issue.
+- **Next action:** Close it once #11 is resolved, or convert it into a tracking issue for the remaining operational work.
 
 ---
 
-## Quick Reference: Issue Priority Order
+## Completed This Cycle
 
-| Rank | Issue | Priority | Branch |
-|---|---|---|---|
-| 1 | #6 — Liveness session hardening | P1 | `fix/liveness-session-hardening` |
-| 2 | #8 — Structured logging | P1 | `fix/structured-logging` |
-| 3 | #10 — Parameterized enrollment | P2 | `feat/enrollment-workflow` |
-| 4 | #11 — Face-recognition evaluation | P2 | `test/face-recognition-evaluation` |
-| 5 | #12 — Database migrations/backup | P2 | `test/database-migrations` |
-| 6 | #13 — Stabilization backlog (tracking) | P2 | — (metadata only) |
+These are recorded for traceability. They need no further action.
+
+| Issue | PRs | Summary |
+|---|---|---|
+| #6 | #26 | Session TTL from creation, consumption tracking, user binding, audit logging |
+| #8 | #29 | Structured logging with a redaction record factory, 17 tests |
+| #10 | #27, #30 | Parameterized enrollment, recognition, and manual client; atomic writes; overwrite protection; 22 tests |
+| #12 | #31, #32, #33, #34 | Versioned migrations, backup and restore, health and readiness endpoints, deployment baseline and runbook |
 
 ---
 
-## Dependencies Between Issues
+## Follow-up Work Not Tracked by an Issue
 
-- **#6 (liveness hardening)** depends on **authentication** (already merged in #4/PR #20) but is independent otherwise. Session binding to authenticated principal is the key integration.
-- **#8 (structured logging)** is independent; no blocking dependencies.
-- **#10 (parameterized enrollment)** depends on configuration for embedding directory (already resolved in #2/#17) and input validation (already resolved in #5/#19). Can proceed independently.
-- **#11 (face-recognition evaluation)** blocked by model asset availability. Document current limitations while awaiting assets.
-- **#12 (database migrations)** independent; can proceed once schema stability is confirmed (already verified).
+These were identified while working the cycle. None is urgent, and none has an acceptance criterion yet.
+
+| Item | Where it is recorded | Priority |
+|---|---|---|
+| Enable branch protection on `main` requiring the `Compile and test` and `Secret scan` checks | KI-018 | P1 — needs owner action in the repository settings |
+| Remove the unused service methods (`attendance_already_marked`, `verify_attendance`, `verify_face_from_frame`) | KI-019 | P3 |
+| Encrypt backups at rest | `docs/DATABASE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 |
+| Add a backup retention policy so old backups do not accumulate | `docs/DATABASE.md` | P2 |
+| Schedule backups automatically | `docs/DEPLOYMENT.md` | P2 |
+| Load test the attendance verification path with real faces | `docs/ROADMAP.md` | P2 — depends on a dataset |
+| Add metrics and tracing | `docs/ROADMAP.md`, `docs/DEPLOYMENT.md` | P2 |
+| Add an authenticated admin enrollment API | `docs/ARCHITECTURE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 |
+| Add an enrollment audit trail and a consent record | `docs/SECURITY_AND_PRIVACY.md` | P2 |
+| Support multiple workers with a shared liveness session store | `docs/DEPLOYMENT.md` | P2 |
+| Add a schema downgrade path | `docs/DATABASE.md` | P3 |
+| Checksum the migrations so a modified applied migration is detected | `docs/DATABASE.md` | P3 |
+
+---
+
+## Suggested Execution Order
+
+1. **#11** — assemble the consented dataset, run the evaluation, publish the measurements. Everything else in the backlog depends on this being the last accuracy blocker.
+2. **Branch protection** — one repository settings change. It is the only P1 item left and it is the owner's action, not a code change.
+3. **Backup encryption, retention, and scheduling** — closes the remaining data-protection gaps.
+4. **Metrics and tracing** — needed before any real deployment.
+5. **The P3 cleanups** — when there is time.
+
+---
+
+## Execution Queue
+
+| Rank | Item | Priority | Branch | Next action |
+|---|---|---|---|---|
+| 1 | #11 — accuracy evaluation | P2 | `feat/evaluation-run` | Assemble a consented dataset |
+| 2 | Branch protection | P1 | — | Owner action in the repository settings |
+| 3 | Backup encryption and retention | P2 | `feat/backup-hardening` | Implement |
+| 4 | Automatic backup schedule | P2 | `feat/backup-schedule` | Implement |
+| 5 | Metrics and tracing | P2 | `feat/observability` | Implement |
+| 6 | Dead code removal | P3 | `chore/remove-dead-code` | Implement |
+| 7 | #13 — close the tracking issue | P2 | — | Close after #11 |

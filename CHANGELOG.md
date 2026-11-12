@@ -102,3 +102,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 - The deployment baseline no longer omits the cost of the biometric models.
+
+### Changed
+- `docs/ISSUE_AUDIT.md`, `docs/ISSUE_BACKLOG.md`, and `docs/PROJECT_STATUS.md` updated to the verified state after PRs #26, #29, #30, #31, #32, #33, #34, and #35. The audit records that issues #8 and #10 were previously reported as complete while the code had not reached `main`, and how each was corrected.
