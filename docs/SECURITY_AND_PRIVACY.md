@@ -157,3 +157,34 @@ appropriate retention period and restrict access to the log stream.
 
 Logs are not an audit system. They are diagnostic output and do not provide
 tamper-evident records of attendance operations.
+
+## Enrollment consent and authorization
+
+Enrollment writes a biometric template. It is a controlled local operation
+that is not exposed through the API, and it is not reachable by a student
+account.
+
+Before an enrollment is performed:
+
+- the person in the source image must have consented to being enrolled;
+- the source image must contain exactly one face, so that the template is
+  unambiguous;
+- the image must not be committed to the repository. Face images and
+  embeddings are gitignored.
+
+Controls that protect the enrollment workflow:
+
+- the student identifier is validated against a strict pattern before it is
+  used to build a path;
+- the destination is always resolved inside the configured embedding
+  directory, and a caller cannot point it elsewhere;
+- an existing embedding is never replaced without an explicit `--overwrite`
+  flag, because replacing it makes the student unverifiable against the
+  previous template;
+- the embedding is written to a temporary file and moved into place only
+  after it is complete, so a failure never leaves a corrupt template;
+- the workflow logs operational metadata only. Embedding vectors and image
+  contents are never written to the log.
+
+There is no self-service enrollment path and no enrollment audit trail.
+Both remain future work.

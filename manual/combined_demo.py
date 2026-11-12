@@ -3,6 +3,9 @@ import mediapipe as mp
 import math
 import numpy as np
 import insightface
+import os
+
+from pathlib import Path
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -10,19 +13,43 @@ from mediapipe.tasks.python import vision
 
 # ============================================================
 # CONFIGURATION
+#
+# Every path and identifier can be overridden with an environment
+# variable so that the demo runs on any machine without editing
+# the source.
 # ============================================================
 
-MODEL_PATH = r"C:\AI-Attendance-System\ai-service\models\mediapipe\face_landmarker.task"
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-REGISTERED_EMBEDDING = r"C:\AI-Attendance-System\ai-service\data\face_embeddings\STU001.npy"
+MODEL_PATH = os.getenv(
+    "MEDIAPIPE_FACE_LANDMARKER_MODEL",
+    str(
+        BASE_DIR
+        / "models"
+        / "mediapipe"
+        / "face_landmarker.task"
+    ),
+)
 
-STUDENT_ID = "STU001"
+REGISTERED_EMBEDDING = os.getenv(
+    "REGISTERED_EMBEDDING_PATH",
+    str(
+        BASE_DIR
+        / "data"
+        / "face_embeddings"
+        / f"{os.getenv('ATTENDANCE_STUDENT_ID', 'STUDENT')}.npy"
+    ),
+)
+
+STUDENT_ID = os.getenv("ATTENDANCE_STUDENT_ID", "STUDENT")
 
 # Liveness threshold
-EAR_THRESHOLD = 0.10
+EAR_THRESHOLD = float(os.getenv("EAR_THRESHOLD", "0.10"))
 
 # Face recognition threshold
-RECOGNITION_THRESHOLD = 0.40
+RECOGNITION_THRESHOLD = float(
+    os.getenv("RECOGNITION_THRESHOLD", "0.40")
+)
 
 
 # ============================================================

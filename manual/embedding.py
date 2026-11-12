@@ -1,19 +1,27 @@
 import cv2
+import os
 from pathlib import Path
 from insightface.app import FaceAnalysis
 
 
 # =========================================================
 # PATHS
+#
+# Override with EMBEDDING_IMAGE_PATH.
 # =========================================================
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-IMAGE_PATH = (
-    BASE_DIR
-    / "tests"
-    / "fixtures"
-    / "test.jpg"
+IMAGE_PATH = Path(
+    os.getenv(
+        "EMBEDDING_IMAGE_PATH",
+        str(
+            BASE_DIR
+            / "tests"
+            / "fixtures"
+            / "test.jpg"
+        ),
+    )
 )
 
 

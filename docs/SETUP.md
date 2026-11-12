@@ -222,3 +222,98 @@ See [TESTING.md](TESTING.md) for what is and is not covered.
 - Recognition accuracy, liveness accuracy, and presentation-attack resistance.
 - TLS, rate limiting, account lockout, MFA/SSO, and audit logging.
 - Full API/database coverage and CI beyond the focused runtime tests.
+
+## Enrolling a face embedding
+
+Enrollment writes biometric data. It is a controlled local operation and is
+not exposed through the API.
+
+Prerequisites:
+
+- a local account provisioned with `python -m app.auth.cli create-user`;
+- the MediaPipe and InsightFace model assets in place (see the model
+  provisioning section above);
+- an image that contains exactly one face, belonging to a person who has
+  consented to being enrolled;
+- write permission on the configured embedding directory.
+
+Dry run first, to validate the request without writing a file:
+
+```bash
+python -m app.services.register_face \
+  --student-id STU001 \
+  --image /path/to/consented-image.jpg \
+  --dry-run
+```
+
+Then perform the enrollment:
+
+```bash
+python -m app.services.register_face \
+  --student-id STU001 \
+  --image /path/to/consented-image.jpg
+```
+
+The command refuses to replace an existing embedding. Replacing one is a
+destructive operation, because the student can no longer be verified against
+the previous template. Replace it deliberately:
+
+```bash
+python -m app.services.register_face \
+  --student-id STU001 \
+  --image /path/to/consented-image.jpg \
+  --overwrite
+```
+
+Options:
+
+| Option | Meaning |
+| --- | --- |
+| `--student-id` | Student identifier. Validated against the identifier pattern. |
+| `--image` | Source image containing exactly one face. |
+| `--output-dir` | Destination directory. Must stay inside the configured embedding directory. |
+| `--overwrite` | Replace an existing embedding. |
+| `--dry-run` | Validate the request without writing a file. |
+
+The embedding is written to a temporary file in the destination directory
+and moved into place only after it is complete, so a failed enrollment never
+leaves a partial `.npy` file.
+
+### Verifying a registration
+
+```bash
+python -m app.services.recognize_face \
+  --student-id STU001 \
+  --image /path/to/consented-image.jpg
+```
+
+## Running the manual API client
+
+The manual client drives the camera through the liveness flow and then
+submits the attendance request. Every value is configurable.
+
+```bash
+python -m manual.api_attendance \
+  --username student1 \
+  --student-id STU001 \
+  --subject "Java Programming" \
+  --lecture-id JAVA-LECTURE-001
+```
+
+The same values can be supplied through environment variables, which is
+useful for repeated runs:
+
+| Variable | Argument | Purpose |
+| --- | --- | --- |
+| `ATTENDANCE_API_URL` | `--base-url` | Base URL of the running API. Default `http://127.0.0.1:8000`. |
+| `ATTENDANCE_USERNAME` | `--username` | Account used to request a bearer token. |
+| `ATTENDANCE_STUDENT_ID` | `--student-id` | Student identifier recorded with the attendance. |
+| `ATTENDANCE_SUBJECT` | `--subject` | Subject recorded with the attendance. |
+| `ATTENDANCE_LECTURE_ID` | `--lecture-id` | Lecture recorded with the attendance. |
+| `ATTENDANCE_CAMERA_INDEX` | `--camera-index` | Camera device index. Default `0`. |
+| `ATTENDANCE_PASSWORD` | — | Password. When unset the client prompts for it. |
+
+Command line arguments take precedence over environment variables.
+
+The password is never accepted as a command line argument, because process
+arguments are visible to other users on the machine.

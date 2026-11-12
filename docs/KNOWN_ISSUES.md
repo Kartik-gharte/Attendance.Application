@@ -21,12 +21,12 @@ Severity is a triage aid, not a formal risk rating.
 | KI-011 | High | No retention, deletion, encryption, or backup policy | Partially resolved (delete_old_attendance function implemented) |
 | KI-012 | Medium | In-memory sessions are per-process and never cleaned up | **Resolved** (PR #26). Sessions are now removed on expiry and after consumption, preventing unbounded growth. Single-process constraint documented. |
 | KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile | Resolved |
-| KI-014 | Medium | Broken import in `test_liveness_service.py` | Open |
+| KI-014 | Medium | Broken import in `test_liveness_service.py` | **Resolved** (root scripts moved to `manual/` in PR #23; the duplicate broken module was removed and no broken import remains in the collected test suite) |
 | KI-015 | Medium | Missing fixtures and model assets | Resolved (tests use synthetic fixtures, no model/assets required) |
-| KI-016 | Medium | Registration and client paths/IDs are hardcoded | Open |
+| KI-016 | Medium | Registration and client paths/IDs are hardcoded | **Resolved**. Enrollment and recognition are parameterized functions with CLI entry points; the manual API client and the manual demo scripts read their values from arguments or environment variables. Windows paths removed. |
 | KI-017 | Medium | Logs contain personal data and use `print()` | **Resolved** (branch `fix/structured-logging`). Logging module configured once at startup; operational `print()` calls replaced with leveled log calls; redaction factory masks credentials, session IDs, and embedding vectors; log capture tests assert sensitive values are absent. |
 | KI-018 | Medium | No CI or verified branch protection | CI workflow merged; branch protection not configured (requires manual enablement) |
-| KI-019 | Low | Dead/duplicate code paths and scripts | Open |
+| KI-019 | Low | Dead/duplicate code paths and scripts | **Partially resolved**. The hardcoded scripts were replaced by parameterized workflows and the duplicate broken test module was removed. Remaining dead code is tracked separately. |
 | KI-020 | High | Anti-spoofing effectiveness is unmeasured | Open |
 
 ## Details
@@ -133,8 +133,8 @@ Severity is a triage aid, not a formal risk rating.
 
 - **Evidence:** `test_liveness_service.py:3` imports `from liveness import LivenessService`; the module lives at `app.services.liveness`.
 - **Impact:** The root script fails immediately.
-- **Proposed fix:** Correct the import or retire the duplicate script as part of the test refactor.
-- **Status:** Open.
+- **Resolution:** The root scripts were moved to `manual/` in PR #23 so that pytest no longer collects them. The duplicate broken module was removed and the collected suite has no broken import.
+- **Status:** Resolved.
 
 ### KI-015 — Missing fixtures and model assets
 
@@ -147,8 +147,8 @@ Severity is a triage aid, not a formal risk rating.
 
 - **Evidence:** `app/services/register_face.py`, `recognize_face.py`, `combined_test.py`, and `test_api_attendance.py` hardcode `STU001`, image names, API URLs, subject/lecture values, and output paths.
 - **Impact:** Accidental data overwrite, wrong-student testing, and non-portable paths.
-- **Proposed fix:** Parameterize via CLI arguments/environment and validate output paths.
-- **Status:** Open.
+- **Resolution:** `register_face.py` and `recognize_face.py` are parameterized functions with CLI entry points. Identifiers are validated, destinations are resolved inside the configured embedding directory, existing embeddings are refused without `--overwrite`, and writes are atomic. The manual API client and the manual demo scripts read their values from arguments or environment variables, and the Windows-specific paths were removed.
+- **Status:** Resolved.
 
 ### KI-017 — PII in console logs
 
@@ -169,8 +169,8 @@ Severity is a triage aid, not a formal risk rating.
 
 - **Evidence:** `attendance_already_marked()` is unused; `AttendanceVerificationService.verify_attendance()` and `verify_face_from_frame()` are not used by the API; multiple overlapping camera scripts exist; `test_liveness_service.py` duplicates `tests/services/test_liveness_service.py`.
 - **Impact:** Confusing ownership and maintenance risk.
-- **Proposed fix:** Remove or consolidate during a scoped cleanup after tests protect behavior.
-- **Status:** Open; low priority.
+- **Resolution:** The hardcoded scripts were replaced by parameterized workflows and the duplicate broken test module was removed. A remaining pass over the unused service methods is still open.
+- **Status:** Partially resolved; low priority.
 
 ### KI-020 — Anti-spoofing effectiveness is unmeasured
 

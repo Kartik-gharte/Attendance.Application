@@ -1,27 +1,41 @@
 import cv2
 import numpy as np
+import os
 from pathlib import Path
 from insightface.app import FaceAnalysis
 
 
 # =========================================================
 # PATHS
+#
+# Override with RECOGNITION_IMAGE_PATH, ATTENDANCE_STUDENT_ID, or
+# FACE_EMBEDDING_DIR.
 # =========================================================
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-IMAGE_PATH = (
-    BASE_DIR
-    / "tests"
-    / "fixtures"
-    / "test.jpg"
+STUDENT_ID = os.getenv("ATTENDANCE_STUDENT_ID", "STUDENT")
+
+IMAGE_PATH = Path(
+    os.getenv(
+        "RECOGNITION_IMAGE_PATH",
+        str(
+            BASE_DIR
+            / "tests"
+            / "fixtures"
+            / "test.jpg"
+        ),
+    )
 )
 
 EMBEDDING_PATH = (
-    BASE_DIR
-    / "data"
-    / "face_embeddings"
-    / "STU001.npy"
+    Path(
+        os.getenv(
+            "FACE_EMBEDDING_DIR",
+            str(BASE_DIR / "data" / "face_embeddings"),
+        )
+    )
+    / f"{os.getenv('ATTENDANCE_STUDENT_ID', 'STUDENT')}.npy"
 )
 
 
@@ -212,7 +226,7 @@ print(
 
 print(
     "Student ID:",
-    "STU001"
+    STUDENT_ID
 )
 
 
