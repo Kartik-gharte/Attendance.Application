@@ -129,3 +129,41 @@ reset and deactivation revoke all active tokens for that account.
 - A configurable log level.
 
 Do not add secrets to source control or documentation.
+
+## Logging
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `LOG_LEVEL` | `INFO` | Application log level. One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
+| `LOG_FORMAT` | `%(asctime)s %(levelname)s %(name)s %(message)s` | `logging.Formatter` format string applied to application log records. |
+
+Logging is configured once during application startup in `app/main.py` using
+`app/core/logging_config.py`. Records are written to `stderr` so that they
+can be collected by a process supervisor or container runtime without
+interfering with standard output.
+
+### Redaction policy
+
+The following values are masked before any handler receives a record:
+
+- bearer tokens, passwords, API keys, and other `key=value` credentials;
+- UUID-shaped liveness session identifiers;
+- float vectors that resemble face embeddings.
+
+Redaction is applied through a log record factory, so records are sanitized
+at creation time and every handler — including one attached later by an
+operator — receives sanitized values.
+
+`student_id` is logged at `INFO` level for attendance outcomes, because an
+administrator must be able to reconcile a record. It is never logged
+alongside raw biometric material. At `WARNING` level and above, server-side
+diagnostics are limited to the exception type, so internal filesystem paths
+do not appear at the default level.
+
+### Retention and access
+
+Logs are ordinary process output and are not stored by the application. When
+the service runs under a supervisor or container runtime, log retention and
+access are controlled by that runtime. Treat logs as a personal-data store:
+they may contain `student_id` values and must be access-controlled and
+retained only as long as the operational need requires.

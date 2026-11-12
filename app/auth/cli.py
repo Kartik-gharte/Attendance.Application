@@ -1,8 +1,8 @@
 import argparse
 import getpass
-import sys
 from pathlib import Path
 
+from app.core.logging_config import get_logger
 from app.auth.service import (
     create_user,
     deactivate_user,
@@ -21,6 +21,9 @@ def _prompt_password() -> str:
         raise ValueError("Passwords do not match")
 
     return password
+
+
+logger = get_logger("auth.cli")
 
 
 def _database_path(value: str | None) -> Path:
@@ -138,7 +141,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Deactivated '{args.username}'")
 
     except ValueError as error:
-        print(f"Error: {error}", file=sys.stderr)
+        # Errors are reported through the logger so that the redaction
+        # filter applies. User-facing confirmations above stay on stdout
+        # because they are the CLI's intended output, not operational logs.
+        logger.error("Authentication command failed: error=%s", error)
         return 1
 
     return 0

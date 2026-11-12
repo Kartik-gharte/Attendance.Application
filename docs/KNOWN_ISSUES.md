@@ -24,7 +24,7 @@ Severity is a triage aid, not a formal risk rating.
 | KI-014 | Medium | Broken import in `test_liveness_service.py` | Open |
 | KI-015 | Medium | Missing fixtures and model assets | Resolved (tests use synthetic fixtures, no model/assets required) |
 | KI-016 | Medium | Registration and client paths/IDs are hardcoded | Open |
-| KI-017 | Medium | Logs contain personal data and use `print()` | Open |
+| KI-017 | Medium | Logs contain personal data and use `print()` | **Resolved** (branch `fix/structured-logging`). Logging module configured once at startup; operational `print()` calls replaced with leveled log calls; redaction factory masks credentials, session IDs, and embedding vectors; log capture tests assert sensitive values are absent. |
 | KI-018 | Medium | No CI or verified branch protection | CI workflow merged; branch protection not configured (requires manual enablement) |
 | KI-019 | Low | Dead/duplicate code paths and scripts | Open |
 | KI-020 | High | Anti-spoofing effectiveness is unmeasured | Open |
@@ -152,10 +152,11 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-017 — PII in console logs
 
-- **Evidence:** `app/api/routes.py` prints student ID, subject, lecture ID, filename, byte size, face result, and database result; services print detection details.
+- **Evidence:** `app/api/routes.py` printed student ID, subject, lecture ID, filename, byte size, face result, and database result; services printed detection details.
 - **Impact:** Personal data may persist in terminal/CI logs with no redaction or retention control.
-- **Proposed fix:** Adopt structured logging with levels and redaction; prohibit raw images, embeddings, and session IDs in logs.
-- **Status:** Open.
+- **Resolution:** `app/core/logging_config.py` configures the `logging` module once during startup with a configurable level and format. All operational `print()` calls were replaced with leveled log calls. A log record factory masks bearer tokens, passwords, API keys, UUID-shaped liveness session identifiers, and float vectors resembling face embeddings. `tests/runtime/test_logging.py` asserts that sensitive values are absent from captured logs, and `tests/runtime/test_attendance_api.py` asserts that a successful attendance request does not leak the bearer token, session identifier, or password.
+- **Remaining risk:** `student_id` is logged at `INFO` level for attendance reconciliation. Operators who require identifier-free logs should run at `WARNING` level or above. Log retention and access are delegated to the process supervisor.
+- **Status:** Resolved.
 
 ### KI-018 — No CI or verified branch protection
 
