@@ -203,3 +203,37 @@ caller choose where an embedding is read from or written to.
 The manual API client under `manual/api_attendance.py` drives the API path
 from a camera. It reads its student, subject, lecture, and server values
 from arguments or environment variables and holds no hardcoded identifiers.
+
+## Database startup and migrations
+
+```
+FastAPI lifespan (app/main.py)
+  -> initialize_database(database_path)   -> ensure_schema()
+  -> initialize_auth_database(path)       -> ensure_schema()
+  -> build_services(settings)
+```
+
+`ensure_schema()` is idempotent, so both calls are safe. The first call
+creates the schema and records the version; the second finds the database
+current and applies nothing.
+
+```
+ensure_schema(database_path)
+  -> open connection in autocommit mode
+  -> create schema_migrations table if needed
+  -> read applied versions
+  -> for each pending migration, in ascending version order:
+       BEGIN
+         run the migration
+         record the version
+       COMMIT
+       (ROLLBACK and raise MigrationError on failure)
+```
+
+The explicit transaction matters: the default driver mode only opens a
+transaction for data modification, so a migration that creates a table and
+then fails would otherwise leave the table behind.
+
+Schema definitions live in `app/database/migrations.py`. The attendance
+table definition moved out of `app/database/attendance_db.py` so that the
+schema has a single source of truth.
