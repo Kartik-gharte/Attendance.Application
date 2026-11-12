@@ -88,4 +88,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 - `docs/DEPLOYMENT.md` describing the requirements, the single-worker constraint for the in-memory liveness sessions, the TLS expectation, the health probe configuration, the measured baseline, and a runbook covering deploying, backing up, upgrading, rolling back, and diagnosing failures.
-- `manual/benchmark.py` measuring the import time, the resident memory, the startup cost, the request latency, and the throughput under concurrency. The measurement is reproducible with `python -m manual.benchmark`.
+- `manual/benchmark.py` measuring the import time, the resident memory, the startup cost, the request latency, and the throughput under concurrency. The measurement is reproducible with `python -m manual.benchmark`, and `python -m manual.benchmark --with-models` additionally reports the startup cost and memory with the real biometric models loaded.
+
+### Added
+- `app/evaluation/harness.py` with the reproducible evaluation machinery: a versioned dataset description, dataset validation that refuses an untrustworthy dataset, per-attempt scores and decisions, false accept and false reject rates, a ROC curve, the equal error rate, the liveness success rate, and Wilson score intervals.
+- `app/evaluation/evaluate.py` running the evaluation against the real models and writing a report that contains no images, embeddings, or biometric templates.
+- `tests/runtime/test_evaluation_harness.py` covering the dataset parsing and validation, the metric computations, the uncertainty intervals, and the report format.
+- `docs/EVALUATION_DATASET_POLICY.md` specifying the dataset that the accuracy evaluation needs, the consent rules, the dataset description format, how to run the evaluation, and what may not be claimed until it has been run.
+
+### Changed
+- `docs/DEPLOYMENT.md` records the measured baseline with the real model assets: 1.0 s startup and 986 MB resident memory, against 165 MB without the models.
+- `manual/benchmark.py` accepts `--with-models` to report the startup cost and memory with the real biometric models loaded.
+
+### Fixed
+- The deployment baseline no longer omits the cost of the biometric models.

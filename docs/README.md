@@ -23,6 +23,7 @@ This directory contains the authoritative project documentation. Source code rem
 ## Testing and security
 
 - [Testing](TESTING.md) — manual scripts, current gaps, and safe verification commands.
+- [Evaluation dataset policy](EVALUATION_DATASET_POLICY.md) — the dataset the accuracy evaluation needs, the consent rules, and how to run it.
 - [Security and privacy](SECURITY_AND_PRIVACY.md) — biometric data, access control, and anti-spoofing limitations.
 - [Known issues](KNOWN_ISSUES.md) — confirmed outstanding problems with evidence and proposed fixes.
 

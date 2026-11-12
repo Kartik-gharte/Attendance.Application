@@ -232,6 +232,51 @@ def measure_concurrency(workers: int = 8, requests_per_worker: int = 25) -> dict
     }
 
 
+def measure_real_models() -> dict:
+    """Measure the startup cost and memory with the real biometric models.
+
+    The models must be provisioned. The measurement fails with an
+    actionable message when they are not, because that is exactly the
+    situation the measurement exists to describe.
+    """
+
+    import subprocess
+
+    script = (
+        "import os, resource, sys, time\n"
+        f"sys.path.insert(0, {str(Path(__file__).resolve().parents[1])!r})\n"
+        "from app.core.config import get_settings\n"
+        "from app.core.services import build_services\n"
+        "start = time.perf_counter()\n"
+        "services = build_services(get_settings())\n"
+        "elapsed = time.perf_counter() - start\n"
+        "rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 / 1024\n"
+        "print(elapsed)\n"
+        "print(rss)\n"
+        "services.close()\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            "The real model measurement failed. The models are probably "
+            "not provisioned. See docs/SETUP.md.\n"
+            f"{result.stderr[-500:]}"
+        )
+
+    lines = result.stdout.strip().split("\n")
+
+    return {
+        "startup_seconds": float(lines[0]),
+        "memory_mb": float(lines[1]),
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Measure the baseline startup cost, memory, and latency",
@@ -247,6 +292,12 @@ def main(argv=None) -> int:
         type=int,
         default=8,
         help="Number of concurrent workers in the concurrency measurement",
+    )
+    parser.add_argument(
+        "--with-models",
+        action="store_true",
+        help="Also measure the startup cost and memory with the real "
+        "biometric models. Requires the models to be provisioned.",
     )
 
     args = parser.parse_args(argv)
@@ -298,10 +349,31 @@ def main(argv=None) -> int:
         )
         print()
 
+    if args.with_models:
+
+        try:
+
+            models = measure_real_models()
+
+            print(
+                f"Startup with real model assets:   "
+                f"{models['startup_seconds']:.2f} s"
+            )
+            print(
+                f"Resident memory with real models:  "
+                f"{models['memory_mb']:.1f} MB"
+            )
+            print()
+
+        except RuntimeError as error:
+
+            print(f"Real model measurement unavailable: {error}")
+            print()
+
     print(
         "These numbers were measured on a developer machine with the "
-        "biometric\nmodels stubbed out. They are a baseline, not a capacity "
-        "guarantee."
+        "biometric\nmodels stubbed out, unless --with-models was used. They "
+        "are a baseline,\nnot a capacity guarantee."
     )
 
     return 0
