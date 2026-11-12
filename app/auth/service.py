@@ -13,6 +13,7 @@ from app.auth.models import (
     UserPrincipal,
 )
 from app.database.attendance_db import get_connection
+from app.database.migrations import ensure_schema
 from app.services.validation import validate_student_id
 
 
@@ -82,65 +83,15 @@ def hash_password(password: str) -> str:
 
 
 def initialize_auth_database(database_path=None) -> None:
-    """Create the authentication tables if they do not exist."""
+    """Bring the database up to the current schema version.
 
-    connection = get_connection(database_path)
+    The authentication tables are created by the versioned migrations in
+    :mod:`app.database.migrations`, together with the rest of the schema.
+    The call is idempotent and adopts a database that was created before
+    schema versioning existed without losing its rows.
+    """
 
-    try:
-        cursor = connection.cursor()
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL COLLATE NOCASE UNIQUE,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL CHECK (role IN ('student', 'admin')),
-                student_id TEXT UNIQUE,
-                is_active INTEGER NOT NULL DEFAULT 1
-                    CHECK (is_active IN (0, 1)),
-                created_at TEXT NOT NULL,
-                CHECK (
-                    (role = 'student' AND student_id IS NOT NULL)
-                    OR (role = 'admin' AND student_id IS NULL)
-                )
-            )
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS auth_tokens (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                token_hash TEXT NOT NULL UNIQUE,
-                created_at TEXT NOT NULL,
-                expires_at TEXT NOT NULL,
-                revoked_at TEXT,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-                    ON DELETE CASCADE
-            )
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id
-            ON auth_tokens (user_id)
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at
-            ON auth_tokens (expires_at)
-            """
-        )
-
-        connection.commit()
-
-    finally:
-        connection.close()
+    ensure_schema(database_path)
 
 
 def create_user(

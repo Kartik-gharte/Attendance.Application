@@ -159,3 +159,56 @@ Authentication timestamps (`users.created_at`, `auth_tokens.created_at`, `expire
 Set `ATTENDANCE_DB_PATH` to a temporary path before importing or starting the application, or construct `Settings(database_path=...)` and pass it to `create_app()`. The lifespan initializes the schema for that path, and attendance routes use the path stored on `app.state.settings`.
 
 Database helpers also accept an explicit `database_path` argument for isolated tests. Do not write test records into a real local attendance database.
+
+## Schema versioning and migrations
+
+The schema is versioned. Applied versions are recorded in the
+`schema_migrations` table, which holds the version number, the migration
+name, and the time it was applied.
+
+| Version | Name | Change |
+| --- | --- | --- |
+| 1 | `initial_schema` | Creates the `attendance`, `users`, and `auth_tokens` tables and their indexes. |
+
+### Applying migrations
+
+Migrations are applied automatically during application startup. The
+lifespan calls `ensure_schema()` before the service accepts requests, so a
+fresh database is created and an existing database is brought up to date
+without operator action.
+
+They can also be applied and inspected from the command line:
+
+```bash
+python -m app.database.migrations status
+python -m app.database.migrations upgrade
+```
+
+Both commands accept `--database-path` and default to the configured
+`ATTENDANCE_DB_PATH`.
+
+### Behaviour
+
+- **Idempotent.** Applying migrations to a current database does nothing.
+- **Adopting an existing database.** Migration 1 creates its tables with
+  `CREATE TABLE IF NOT EXISTS`, so a database that was created before schema
+  versioning existed is adopted at the baseline version. Existing rows and
+  the `UNIQUE (student_id, lecture_id, attendance_date)` duplicate
+  protection are preserved.
+- **Atomic.** Each migration runs inside its own transaction. When a
+  migration raises, the transaction is rolled back, the failure is reported
+  as a `MigrationError` that names the version and the migration, and the
+  versions that were applied earlier stay recorded. A partially applied
+  schema is never left behind.
+- **Ordered.** Migrations run in ascending version order and each version
+  is applied at most once.
+
+### Adding a migration
+
+1. Append a new entry to `MIGRATIONS` in `app/database/migrations.py` with
+   the next version number.
+2. Bump `SCHEMA_VERSION` to the new version.
+3. Write the migration so that it can run against a database that already
+   has the previous version, and so that it is safe to re-run.
+4. Add a test that covers the fresh path, the upgrade path from the
+   previous version, and the failure path.

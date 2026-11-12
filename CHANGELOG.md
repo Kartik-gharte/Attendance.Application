@@ -64,3 +64,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 - `app/services/recognize_face.py` no longer loads a model or reads a hardcoded image at import time, and no longer calls `logger` before the logger is defined.
 - The manual demo scripts no longer contain Windows-specific paths or hardcoded student identifiers.
+
+### Added
+- `app/database/migrations.py` with a dependency-free versioned migration runner. Applied versions are recorded in a `schema_migrations` table, migrations run in ascending version order, and each migration runs inside its own transaction so that a failure rolls back completely.
+- `python -m app.database.migrations status` and `python -m app.database.migrations upgrade` to inspect and apply migrations.
+- `tests/runtime/test_database_migrations.py` covering fresh database initialization, the upgrade path from a database created before schema versioning existed, migration failure and rollback, and data integrity after a migration.
+
+### Changed
+- `initialize_database()` and `initialize_auth_database()` now delegate to the migration runner. The schema has a single source of truth in `app/database/migrations.py`, and both calls are idempotent.
+
+### Fixed
+- A failing migration no longer leaves a partially applied schema behind. The migration connection uses autocommit mode with an explicit transaction, so DDL is rolled back as well.

@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import datetime
 
 from app.core.config import get_settings
+from app.database.migrations import ensure_schema
 
 
 # =========================================================
@@ -47,54 +48,16 @@ def get_connection(database_path=None):
 
 def initialize_database(database_path=None):
     """
-    Create the attendance table if it does not exist.
+    Bring the database up to the current schema version.
+
+    The schema is created by the versioned migrations in
+    :mod:`app.database.migrations`. The call is idempotent: a database that
+    is already current applies nothing, and a database created before
+    schema versioning existed is adopted at the baseline version without
+    losing its rows.
     """
 
-    connection = get_connection(database_path)
-
-    try:
-
-        cursor = connection.cursor()
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS attendance (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                student_id TEXT NOT NULL,
-
-                subject TEXT NOT NULL,
-
-                lecture_id TEXT NOT NULL,
-
-                attendance_date TEXT NOT NULL,
-
-                attendance_time TEXT NOT NULL,
-
-                liveness_status TEXT NOT NULL,
-
-                face_status TEXT NOT NULL,
-
-                similarity REAL,
-
-                attendance_status TEXT NOT NULL,
-
-                created_at TEXT NOT NULL,
-
-                UNIQUE (
-                    student_id,
-                    lecture_id,
-                    attendance_date
-                )
-            )
-            """
-        )
-
-        connection.commit()
-
-    finally:
-
-        connection.close()
+    ensure_schema(database_path)
 
 
 # =========================================================
