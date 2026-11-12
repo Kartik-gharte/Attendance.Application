@@ -168,3 +168,38 @@ The only remaining `print()` calls in `app/` are the user-facing confirmation
 messages printed by `app/auth/cli.py`. Those are the intended CLI output
 interface rather than operational log events, and they are covered by a test
 that asserts no other module prints to stdout.
+
+## Enrollment path versus API path
+
+Enrollment is deliberately kept off the request path.
+
+```
+CLI enrollment (app/services/register_face.py)
+  -> validate student identifier
+  -> read source image
+  -> detect exactly one face (InsightFace)
+  -> resolve destination inside the configured embedding directory
+  -> refuse to replace an existing embedding without --overwrite
+  -> write to a temporary file, then move into place
+
+CLI recognition (app/services/recognize_face.py)
+  -> validate student identifier
+  -> resolve embedding path inside the configured embedding directory
+  -> detect exactly one face (InsightFace)
+  -> cosine similarity against the registered embedding
+
+API path (POST /attendance/verify)
+  -> authenticate and authorize the student
+  -> consume a bound liveness session
+  -> compare the submitted image with the registered embedding
+  -> write an attendance record
+```
+
+The CLI workflows are controlled local operations. They write and read
+biometric templates on the operator's machine and are not exposed through the
+API. The API path never accepts an embedding from a client and never lets a
+caller choose where an embedding is read from or written to.
+
+The manual API client under `manual/api_attendance.py` drives the API path
+from a camera. It reads its student, subject, lecture, and server values
+from arguments or environment variables and holds no hardcoded identifiers.

@@ -167,3 +167,32 @@ the service runs under a supervisor or container runtime, log retention and
 access are controlled by that runtime. Treat logs as a personal-data store:
 they may contain `student_id` values and must be access-controlled and
 retained only as long as the operational need requires.
+
+## Enrollment and client values
+
+The enrollment and manual client workflows read their values from arguments
+first and environment variables second. The embedding directory used by the
+supported workflow is the configured `FACE_EMBEDDING_DIR`; a caller may
+narrow it with `--output-dir` but cannot point it outside that directory.
+
+| Variable | Default | Used by |
+| --- | --- | --- |
+| `FACE_EMBEDDING_DIR` | `data/face_embeddings` | Enrollment and recognition |
+| `MEDIAPIPE_FACE_LANDMARKER_MODEL` | `models/mediapipe/face_landmarker.task` | Liveness and the manual demo scripts |
+| `ATTENDANCE_API_URL` | `http://127.0.0.1:8000` | Manual API client |
+| `ATTENDANCE_USERNAME` | — | Manual API client |
+| `ATTENDANCE_STUDENT_ID` | — | Manual API client, manual demo scripts |
+| `ATTENDANCE_SUBJECT` | `Java Programming` | Manual API client |
+| `ATTENDANCE_LECTURE_ID` | — | Manual API client |
+| `ATTENDANCE_CAMERA_INDEX` | `0` | Manual API client |
+| `ATTENDANCE_PASSWORD` | — | Manual API client; prompts when unset |
+| `RECOGNITION_IMAGE_PATH` | `tests/fixtures/test.jpg` | `manual/recognition.py` |
+| `EMBEDDING_IMAGE_PATH` | `tests/fixtures/test.jpg` | `manual/embedding.py` |
+| `FACE_DETECTOR_IMAGE_PATH` | `tests/fixtures/test.jpg` | `manual/face_detector.py` |
+| `REGISTERED_EMBEDDING_PATH` | `data/face_embeddings/<student>.npy` | `manual/combined_demo.py` |
+| `EAR_THRESHOLD` | `0.10` | `manual/combined_demo.py` |
+| `RECOGNITION_THRESHOLD` | `0.40` | `manual/combined_demo.py` |
+
+The manual scripts under `manual/` are opt-in developer tools. They are not
+part of the supported runtime workflow and are not covered by the API
+contract.

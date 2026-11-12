@@ -1,11 +1,12 @@
 import cv2
+import os
 
 from app.services.attendance_verification import (
     AttendanceVerificationService
 )
 
 
-STUDENT_ID = "STU001"
+STUDENT_ID = os.getenv("ATTENDANCE_STUDENT_ID", "STUDENT")
 
 
 print()

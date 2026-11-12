@@ -1,26 +1,40 @@
 import cv2
 import mediapipe as mp
+import os
 from pathlib import Path
 
 
 # =========================================================
 # PATHS
+#
+# Override with FACE_DETECTOR_IMAGE_PATH and
+# MEDIAPIPE_FACE_LANDMARKER_MODEL.
 # =========================================================
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-IMAGE_PATH = (
-    BASE_DIR
-    / "tests"
-    / "fixtures"
-    / "test.jpg"
+IMAGE_PATH = Path(
+    os.getenv(
+        "FACE_DETECTOR_IMAGE_PATH",
+        str(
+            BASE_DIR
+            / "tests"
+            / "fixtures"
+            / "test.jpg"
+        ),
+    )
 )
 
-MODEL_PATH = (
-    BASE_DIR
-    / "models"
-    / "mediapipe"
-    / "blaze_face_short_range.tflite"
+MODEL_PATH = Path(
+    os.getenv(
+        "MEDIAPIPE_FACE_LANDMARKER_MODEL",
+        str(
+            BASE_DIR
+            / "models"
+            / "mediapipe"
+            / "blaze_face_short_range.tflite"
+        ),
+    )
 )
 
 

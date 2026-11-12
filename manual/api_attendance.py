@@ -1,425 +1,472 @@
-import cv2
+"""Manual client that exercises the attendance verification API.
+
+Every value is configurable through an environment variable or a command
+line argument, so the script is not tied to one student, lecture, or server.
+
+Environment variables
+---------------------
+``ATTENDANCE_API_URL``
+    Base URL of the running API. Default ``http://127.0.0.1:8000``.
+``ATTENDANCE_USERNAME``
+    Account username used to request a bearer token.
+``ATTENDANCE_STUDENT_ID``
+    Student identifier that the attendance is recorded for.
+``ATTENDANCE_SUBJECT``
+    Subject name recorded with the attendance.
+``ATTENDANCE_LECTURE_ID``
+    Lecture identifier recorded with the attendance.
+``ATTENDANCE_PASSWORD``
+    Optional. When set, the password is read from this variable instead of
+    being prompted for. Prefer the prompt.
+
+The password is never taken from a command line argument, because process
+arguments are visible to other users on the machine.
+
+Usage::
+
+    python -m manual.api_attendance --student-id STU001 --subject "Java Programming"
+"""
+
+import argparse
 import getpass
 import os
-import requests
+import sys
 import time
 
+import cv2
+import requests
 
-# =========================================================
-# CONFIGURATION
-# =========================================================
-
-BASE_URL = os.getenv(
-    "ATTENDANCE_API_URL",
-    "http://127.0.0.1:8000",
-)
-
-USERNAME = os.getenv(
-    "ATTENDANCE_USERNAME",
-    "student1",
-)
-
-STUDENT_ID = "STU001"
-SUBJECT = "Java Programming"
-
-# Use a NEW lecture ID for this test.
-# Your existing database already contains JAVA-LECTURE-001.
-LECTURE_ID = "JAVA-LECTURE-API-001"
+from app.core.logging_config import get_logger
 
 
-# =========================================================
-# START LIVENESS SESSION
-# =========================================================
+logger = get_logger("manual.api_attendance")
 
-print()
-print("======================================")
-print("       API ATTENDANCE TEST")
-print("======================================")
-print()
-
-print("Authenticating...")
-
-password = getpass.getpass("Password: ")
-
-auth_response = requests.post(
-    f"{BASE_URL}/auth/token",
-    data={
-        "username": USERNAME,
-        "password": password,
-    },
-    timeout=10,
-)
-
-if auth_response.status_code != 200:
-
-    print("ERROR: Could not authenticate")
-    print(auth_response.text)
-    exit()
-
-access_token = auth_response.json()["access_token"]
-
-AUTH_HEADERS = {
-    "Authorization": f"Bearer {access_token}",
-}
-
-print("Authenticated as:", USERNAME)
-print()
-
-print("Starting liveness session...")
-
-response = requests.post(
-    f"{BASE_URL}/liveness/start",
-    headers=AUTH_HEADERS,
-)
-
-if response.status_code != 200:
-
-    print("ERROR: Could not start liveness session")
-    print(response.text)
-    exit()
-
-session_data = response.json()
-
-if session_data.get("status") != "success":
-
-    print("ERROR:", session_data)
-    exit()
-
-session_id = session_data["session_id"]
-
-print("Liveness session started")
-print("Session ID:", session_id)
+DEFAULT_BASE_URL = "http://127.0.0.1:8000"
+DEFAULT_SUBJECT = "Java Programming"
 
 
-# =========================================================
-# OPEN CAMERA
-# =========================================================
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Run the manual attendance verification client",
+    )
 
-camera = cv2.VideoCapture(0)
+    parser.add_argument(
+        "--base-url",
+        default=os.getenv("ATTENDANCE_API_URL", DEFAULT_BASE_URL),
+        help="Base URL of the running API",
+    )
+    parser.add_argument(
+        "--username",
+        default=os.getenv("ATTENDANCE_USERNAME"),
+        help="Account username used to request a bearer token",
+    )
+    parser.add_argument(
+        "--student-id",
+        default=os.getenv("ATTENDANCE_STUDENT_ID"),
+        help="Student identifier the attendance is recorded for",
+    )
+    parser.add_argument(
+        "--subject",
+        default=os.getenv("ATTENDANCE_SUBJECT", DEFAULT_SUBJECT),
+        help="Subject name recorded with the attendance",
+    )
+    parser.add_argument(
+        "--lecture-id",
+        default=os.getenv("ATTENDANCE_LECTURE_ID"),
+        help="Lecture identifier recorded with the attendance",
+    )
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        default=int(os.getenv("ATTENDANCE_CAMERA_INDEX", "0")),
+        help="Camera device index",
+    )
 
-if not camera.isOpened():
-
-    print("ERROR: Could not open camera")
-    exit()
-
-print()
-print("Camera opened")
-print()
-print("Look at the camera.")
-print("Blink ONCE.")
-print()
-print("Press Q to quit.")
+    return parser
 
 
-# =========================================================
-# LIVENESS VARIABLES
-# =========================================================
+def resolve_password(username: str) -> str | None:
+    """Return the account password, prompting when it is not configured."""
 
-liveness_verified = False
-last_send_time = 0
+    configured = os.getenv("ATTENDANCE_PASSWORD")
 
-final_frame = None
+    if configured:
+        return configured
+
+    if not sys.stdin.isatty():
+        logger.error(
+            "No password available. Set ATTENDANCE_PASSWORD or run from a "
+            "terminal."
+        )
+        return None
+
+    return getpass.getpass(f"Password for {username}: ")
 
 
-# =========================================================
-# CAMERA LOOP
-# =========================================================
+def authenticate(
+    base_url: str,
+    username: str,
+    password: str,
+    timeout: int = 10,
+) -> str | None:
+    """Request a bearer token and return it."""
 
-while True:
-
-    success, frame = camera.read()
-
-    if not success:
-
-        print("ERROR: Could not read camera")
-        break
-
-    # -----------------------------------------------------
-    # SEND FRAME TO API
-    # -----------------------------------------------------
-
-    current_time = time.time()
-
-    # Send approximately 8 frames per second.
-    if (
-        not liveness_verified
-        and current_time - last_send_time >= 0.12
-    ):
-
-        last_send_time = current_time
-
-        success_encode, encoded_image = cv2.imencode(
-            ".jpg",
-            frame
+    try:
+        response = requests.post(
+            f"{base_url}/auth/token",
+            data={
+                "username": username,
+                "password": password,
+            },
+            timeout=timeout,
         )
 
-        if success_encode:
+    except requests.RequestException as error:
+        logger.error("Authentication request failed: %s", error)
+        return None
 
-            try:
+    if response.status_code != 200:
+        logger.error("Authentication failed with status %s", response.status_code)
+        return None
 
-                files = {
-                    "image": (
-                        "frame.jpg",
-                        encoded_image.tobytes(),
-                        "image/jpeg"
-                    )
-                }
+    return response.json().get("access_token")
 
-                response = requests.post(
-                    f"{BASE_URL}/liveness/frame",
-                    params={
-                        "session_id": session_id
-                    },
-                    headers=AUTH_HEADERS,
-                    files=files,
-                    timeout=10
-                )
 
-                result = response.json()
+def start_liveness_session(
+    base_url: str,
+    headers: dict[str, str],
+    timeout: int = 10,
+) -> str | None:
+    """Start a liveness session and return its identifier."""
 
-                if result.get("status") == "success":
+    try:
+        response = requests.post(
+            f"{base_url}/liveness/start",
+            headers=headers,
+            timeout=timeout,
+        )
 
-                    face_detected = result.get(
-                        "face_detected",
-                        False
-                    )
+    except requests.RequestException as error:
+        logger.error("Liveness session request failed: %s", error)
+        return None
 
-                    ear = result.get(
-                        "ear"
-                    )
+    if response.status_code != 200:
+        logger.error(
+            "Could not start a liveness session (status %s)",
+            response.status_code,
+        )
+        return None
 
-                    eyes_closed = result.get(
-                        "eyes_closed",
-                        False
-                    )
+    payload = response.json()
 
-                    blink_detected = result.get(
-                        "blink_detected",
-                        False
-                    )
+    if payload.get("status") != "success":
+        logger.error("Liveness session was not started")
+        return None
 
-                    liveness_verified = result.get(
-                        "liveness_verified",
-                        False
-                    )
+    return payload.get("session_id")
 
-                    # -------------------------------------
-                    # DISPLAY STATUS
-                    # -------------------------------------
 
-                    if face_detected:
+def send_liveness_frame(
+    base_url: str,
+    headers: dict[str, str],
+    session_id: str,
+    frame,
+    timeout: int = 10,
+) -> dict | None:
+    """Send one camera frame to the liveness endpoint."""
 
-                        if ear is not None:
+    encoded, buffer = cv2.imencode(".jpg", frame)
 
-                            cv2.putText(
-                                frame,
-                                f"EAR: {ear:.3f}",
-                                (30, 40),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8,
-                                (0, 255, 0),
-                                2
-                            )
+    if not encoded:
+        logger.error("Could not encode the camera frame")
+        return None
 
-                        if eyes_closed:
+    files = {
+        "image": ("frame.jpg", buffer.tobytes(), "image/jpeg"),
+    }
 
-                            cv2.putText(
-                                frame,
-                                "EYES CLOSED",
-                                (30, 80),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8,
-                                (0, 255, 255),
-                                2
-                            )
+    try:
+        response = requests.post(
+            f"{base_url}/liveness/frame",
+            params={"session_id": session_id},
+            headers=headers,
+            files=files,
+            timeout=timeout,
+        )
 
-                        else:
+    except requests.RequestException as error:
+        logger.error("Liveness frame request failed: %s", error)
+        return None
 
-                            cv2.putText(
-                                frame,
-                                "EYES OPEN",
-                                (30, 80),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8,
-                                (0, 255, 0),
-                                2
-                            )
+    try:
+        return response.json()
 
-                    else:
+    except ValueError:
+        logger.error("Liveness endpoint returned a non JSON response")
+        return None
 
-                        cv2.putText(
-                            frame,
-                            "NO FACE",
-                            (30, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.8,
-                            (0, 0, 255),
-                            2
-                        )
 
-                    # -------------------------------------
-                    # BLINK
-                    # -------------------------------------
+def submit_attendance(
+    base_url: str,
+    headers: dict[str, str],
+    session_id: str,
+    student_id: str,
+    subject: str,
+    lecture_id: str,
+    frame,
+    timeout: int = 30,
+) -> dict | None:
+    """Submit the final attendance verification request."""
 
-                    if blink_detected:
+    encoded, buffer = cv2.imencode(".jpg", frame)
 
-                        print()
-                        print("======================================")
-                        print("BLINK DETECTED!")
-                        print("LIVENESS VERIFIED!")
-                        print("======================================")
-                        print()
+    if not encoded:
+        logger.error("Could not encode the final frame")
+        return None
 
-                    # -------------------------------------
-                    # LIVENESS VERIFIED
-                    # -------------------------------------
+    files = {
+        "image": ("attendance.jpg", buffer.tobytes(), "image/jpeg"),
+    }
 
-                    if liveness_verified:
+    data = {
+        "student_id": student_id,
+        "session_id": session_id,
+        "subject": subject,
+        "lecture_id": lecture_id,
+    }
 
-                        cv2.putText(
-                            frame,
-                            "LIVENESS VERIFIED",
-                            (30, 130),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            1,
-                            (0, 255, 0),
-                            3
-                        )
+    try:
+        response = requests.post(
+            f"{base_url}/attendance/verify",
+            data=data,
+            headers=headers,
+            files=files,
+            timeout=timeout,
+        )
 
-                        final_frame = frame.copy()
+    except requests.RequestException as error:
+        logger.error("Attendance request failed: %s", error)
+        return None
 
-                        break
+    try:
+        return response.json()
 
-                else:
+    except ValueError:
+        logger.error("Attendance endpoint returned a non JSON response")
+        return None
 
-                    print(
-                        "Liveness API error:",
-                        result
-                    )
 
-                    break
+def run_camera_liveness(
+    base_url: str,
+    headers: dict[str, str],
+    session_id: str,
+    camera_index: int = 0,
+    frame_interval: float = 0.12,
+):
+    """Open the camera and drive the liveness session.
 
-            except Exception as error:
+    Returns the final captured frame when liveness was verified, otherwise
+    ``None``.
+    """
 
-                print()
-                print("API request error:")
-                print(error)
+    camera = cv2.VideoCapture(camera_index)
+
+    if not camera.isOpened():
+        logger.error("Could not open camera %s", camera_index)
+        return None
+
+    liveness_verified = False
+    last_send_time = 0.0
+    final_frame = None
+
+    try:
+
+        while True:
+
+            success, frame = camera.read()
+
+            if not success:
+                logger.error("Could not read a frame from the camera")
                 break
 
-    # -----------------------------------------------------
-    # DISPLAY CAMERA
-    # -----------------------------------------------------
+            current_time = time.time()
 
-    cv2.imshow(
-        "API Attendance - Liveness",
-        frame
+            if (
+                not liveness_verified
+                and current_time - last_send_time >= frame_interval
+            ):
+
+                last_send_time = current_time
+
+                result = send_liveness_frame(
+                    base_url,
+                    headers,
+                    session_id,
+                    frame,
+                )
+
+                if result is None:
+                    break
+
+                if result.get("status") != "success":
+                    logger.error("Liveness request was rejected")
+                    break
+
+                liveness_verified = bool(
+                    result.get("liveness_verified", False)
+                )
+
+                if liveness_verified:
+                    final_frame = frame.copy()
+
+                draw_status(frame, result)
+
+            cv2.imshow("API Attendance - Liveness", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+
+    finally:
+
+        camera.release()
+        cv2.destroyAllWindows()
+
+    if not liveness_verified:
+        return None
+
+    return final_frame
+
+
+def draw_status(frame, result: dict) -> None:
+    """Overlay the liveness result onto the camera frame."""
+
+    face_detected = result.get("face_detected", False)
+    ear = result.get("ear")
+    eyes_closed = result.get("eyes_closed", False)
+    blink_detected = result.get("blink_detected", False)
+
+    if face_detected:
+
+        if ear is not None:
+            cv2.putText(
+                frame,
+                f"EAR: {ear:.3f}",
+                (30, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 255, 0),
+                2,
+            )
+
+        cv2.putText(
+            frame,
+            "EYES CLOSED" if eyes_closed else "EYES OPEN",
+            (30, 80),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 255, 255) if eyes_closed else (0, 255, 0),
+            2,
+        )
+
+    else:
+
+        cv2.putText(
+            frame,
+            "NO FACE",
+            (30, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 0, 255),
+            2,
+        )
+
+    if blink_detected:
+        logger.info("Blink detected")
+
+    if result.get("liveness_verified"):
+        cv2.putText(
+            frame,
+            "LIVENESS VERIFIED",
+            (30, 130),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 255, 0),
+            3,
+        )
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    missing = [
+        name
+        for name, value in (
+            ("--username", args.username),
+            ("--student-id", args.student_id),
+            ("--lecture-id", args.lecture_id),
+        )
+        if not value
+    ]
+
+    if missing:
+        logger.error(
+            "Missing required value(s): %s. Set the matching environment "
+            "variable or pass the argument.",
+            ", ".join(missing),
+        )
+        return 2
+
+    password = resolve_password(args.username)
+
+    if not password:
+        return 2
+
+    access_token = authenticate(
+        args.base_url,
+        args.username,
+        password,
     )
 
-    key = cv2.waitKey(1) & 0xFF
+    if not access_token:
+        return 1
 
-    if key == ord("q"):
+    headers = {"Authorization": f"Bearer {access_token}"}
 
-        break
+    session_id = start_liveness_session(args.base_url, headers)
 
+    if not session_id:
+        return 1
 
-# =========================================================
-# CAMERA CLEANUP
-# =========================================================
+    logger.info("Liveness session started")
 
-camera.release()
-cv2.destroyAllWindows()
-
-
-# =========================================================
-# CHECK LIVENESS
-# =========================================================
-
-if not liveness_verified:
-
-    print()
-    print("Liveness was not verified.")
-    print("Attendance verification cancelled.")
-    exit()
-
-
-# =========================================================
-# CAPTURE FINAL FACE
-# =========================================================
-
-print()
-print("Liveness verified successfully.")
-print()
-print("Starting attendance face verification...")
-
-
-if final_frame is None:
-
-    print("ERROR: No final frame available.")
-    exit()
-
-
-success_encode, encoded_image = cv2.imencode(
-    ".jpg",
-    final_frame
-)
-
-if not success_encode:
-
-    print("ERROR: Could not encode final image.")
-    exit()
-
-
-# =========================================================
-# SEND ATTENDANCE VERIFICATION
-# =========================================================
-
-files = {
-    "image": (
-        "attendance.jpg",
-        encoded_image.tobytes(),
-        "image/jpeg"
-    )
-}
-
-data = {
-    "student_id": STUDENT_ID,
-    "session_id": session_id,
-    "subject": SUBJECT,
-    "lecture_id": LECTURE_ID
-}
-
-
-try:
-
-    response = requests.post(
-        f"{BASE_URL}/attendance/verify",
-        data=data,
-        headers=AUTH_HEADERS,
-        files=files,
-        timeout=30
+    final_frame = run_camera_liveness(
+        args.base_url,
+        headers,
+        session_id,
+        camera_index=args.camera_index,
     )
 
-    result = response.json()
+    if final_frame is None:
+        logger.error("Liveness was not verified. Cancelling attendance.")
+        return 1
 
-except Exception as error:
+    result = submit_attendance(
+        args.base_url,
+        headers,
+        session_id,
+        args.student_id,
+        args.subject,
+        args.lecture_id,
+        final_frame,
+    )
 
-    print()
-    print("Attendance API error:")
-    print(error)
-    exit()
+    if result is None:
+        return 1
+
+    logger.info("Attendance result: %s", result)
+
+    return 0
 
 
-# =========================================================
-# FINAL RESULT
-# =========================================================
-
-print()
-print("======================================")
-print("       FINAL API RESULT")
-print("======================================")
-print()
-
-print(result)
-
-print()
-print("======================================")
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -54,3 +54,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Liveness session IDs remain in query strings and may be replayed by the same authenticated student within the validity window.
 - Anti-spoofing is heuristic screening, not a trained PAD model.
 - Startup is verified only on macOS arm64 with Python 3.11.16.
+
+### Added
+- `app/services/register_face.py` rewritten as a parameterized enrollment workflow with a `register_face()` function and a CLI entry point. Student identifiers are validated, the destination is resolved inside the configured embedding directory, existing embeddings are refused without `--overwrite`, and the embedding is written atomically.
+- `app/services/recognize_face.py` rewritten as a parameterized recognition workflow with a `recognize_face()` function and a CLI entry point.
+- `manual/api_attendance.py` rewritten so that the API URL, username, student, subject, lecture, and camera index are configurable through arguments or environment variables. The password is never accepted as a command line argument.
+- `tests/runtime/test_enrollment_workflow.py` covering identifier validation, path containment, overwrite refusal, atomic writes, dry runs, the CLI surfaces, and the manual client configuration.
+
+### Fixed
+- `app/services/recognize_face.py` no longer loads a model or reads a hardcoded image at import time, and no longer calls `logger` before the logger is defined.
+- The manual demo scripts no longer contain Windows-specific paths or hardcoded student identifiers.
