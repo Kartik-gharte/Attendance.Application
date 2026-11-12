@@ -27,7 +27,7 @@ Severity is a triage aid, not a formal risk rating.
 | KI-017 | Medium | Logs contain personal data and use `print()` | **Resolved** (branch `fix/structured-logging`). Logging module configured once at startup; operational `print()` calls replaced with leveled log calls; redaction factory masks credentials, session IDs, and embedding vectors; log capture tests assert sensitive values are absent. |
 | KI-018 | Medium | No CI or verified branch protection | CI workflow merged; branch protection not configured (requires manual enablement) |
 | KI-019 | Low | Dead/duplicate code paths and scripts | **Partially resolved**. The hardcoded scripts were replaced by parameterized workflows and the duplicate broken test module was removed. Remaining dead code is tracked separately. |
-| KI-020 | High | Anti-spoofing effectiveness is unmeasured | Open |
+| KI-020 | High | Anti-spoofing effectiveness is unmeasured | **Partially resolved**. A reproducible evaluation harness with dataset validation, per-attempt scoring, FAR/FRR/ROC/EER metrics, and Wilson intervals is implemented and tested. Blocked on a consented evaluation dataset; see issue #11. |
 
 ## Details
 
@@ -176,5 +176,6 @@ Severity is a triage aid, not a formal risk rating.
 
 - **Evidence:** `app/services/anti_spoofing.py` explicitly states it is not a trained model; thresholds are heuristics. No evaluation data or metrics exist.
 - **Impact:** The system may be vulnerable to presentation attacks; current checks must not be represented as certified PAD.
-- **Proposed fix:** Evaluate with a documented attack dataset, add a trained PAD component if required, and publish measured limitations.
-- **Status:** Open; do not make security claims until addressed.
+- **Resolution:** `app/evaluation/harness.py` provides the reproducible measurement machinery: a versioned dataset description, dataset validation that refuses an untrustworthy dataset, per-attempt scores and decisions, false accept and false reject rates, a ROC curve, the equal error rate, the liveness success rate, and Wilson score intervals so a rate from a small sample is reported with its uncertainty. `app/evaluation/evaluate.py` runs the evaluation against the real models and writes a report. The machinery is covered by `tests/runtime/test_evaluation_harness.py`.
+- **Remaining blocker:** No accuracy numbers have been produced. The biometric model assets are provisioned and load correctly, but there is no consented evaluation dataset on this machine, so the harness refuses to run rather than producing an untrustworthy number. The dataset requirements are recorded in issue #11.
+- **Status:** Partially resolved; do not make security claims until the dataset is available and the evaluation has been run.

@@ -13,7 +13,7 @@ production readiness claim.
 | --- | --- |
 | Python | 3.11.16 (the version the CI workflow uses) |
 | Operating system | Verified on macOS arm64. Linux and Windows are not verified. |
-| Memory | See the measured baseline below. The biometric models add to it. |
+| Memory | 2 GB or more. The measured footprint with the real models is 986 MB. |
 | Disk | The database and the face embeddings, plus room for backups. |
 | Camera | Required for the liveness flow. Not required for the API itself. |
 
@@ -101,29 +101,45 @@ instance.
 
 ## Measured baseline
 
-The numbers below were measured on a developer machine with the biometric
-models stubbed out, so they exclude the cost of loading MediaPipe and
-InsightFace. Reproduce them with:
+Reproduce them with:
 
 ```bash
 python -m manual.benchmark
+python -m manual.benchmark --with-models
 ```
+
+Without the biometric models, with the services stubbed out:
 
 | Measurement | Value |
 | --- | --- |
-| Import time for `app.main` | 1.8 s |
-| Resident memory after import | 136 MB |
-| Startup without model assets | 0.06 s |
-| Health request mean latency | 0.8 ms |
-| Health request p95 latency | 1.2 ms |
-| Throughput at 8 concurrent workers | 1630 requests/s |
-| Maximum latency at 8 concurrent workers | 9 ms |
+| Import time for `app.main` | 2.3 s |
+| Resident memory after import | 165 MB |
+| Startup without model assets | 0.03 s |
+| Health request mean latency | 1.7 ms |
+| Health request p95 latency | 2.2 ms |
+| Throughput at 8 concurrent workers | 840 requests/s |
+| Maximum latency at 8 concurrent workers | 19 ms |
+
+With the real MediaPipe and InsightFace assets loaded:
+
+| Measurement | Value |
+| --- | --- |
+| Startup with real model assets | 1.0 s |
+| Resident memory with real models | 986 MB |
+
+The memory figure is the one that matters for capacity planning. The
+InsightFace `buffalo_l` recognition model alone is roughly 320 MB of ONNX
+weights, and the MediaPipe Face Landmarker adds more on top of the
+interpreter baseline. A machine that serves this service should have at
+least 2 GB of memory available to it.
 
 These numbers are a baseline, not a capacity guarantee. They say nothing
 about the attendance verification path, which runs face detection and
 embedding extraction and is far slower than the health endpoint. The
-recognition path has not been benchmarked against real model assets and
-real faces.
+recognition path has not been benchmarked against real faces, because no
+consented dataset is available. See
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) and issue
+[#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11).
 
 ### Known limits
 
