@@ -213,3 +213,20 @@ controls as the live data, kept only as long as the operational need
 requires, and deleted when it is no longer needed. Backups must not be
 committed to the repository. The `data/` directory is gitignored, and the
 default backup location lives inside it.
+
+## Health endpoints
+
+The health and readiness endpoints are unauthenticated so that a process
+supervisor or a load balancer can reach them. They expose only operational
+status.
+
+They do not expose:
+
+- student identifiers, subjects, or lecture identifiers;
+- credentials, tokens, or password hashes;
+- filesystem paths such as the database path or the embedding directory;
+- model contents, embeddings, or images.
+
+A test asserts each of these is absent from the responses. The readiness
+endpoint reports the schema version, which is a number the application
+publishes anyway, and whether the models are loaded, which is a boolean.
