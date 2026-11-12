@@ -212,3 +212,87 @@ Both commands accept `--database-path` and default to the configured
    has the previous version, and so that it is safe to re-run.
 4. Add a test that covers the fresh path, the upgrade path from the
    previous version, and the failure path.
+
+## Backup and restore
+
+The database and the face embeddings are local state that cannot be
+regenerated from the repository. `app/database/backup.py` copies them to a
+safe place and puts them back.
+
+### What a backup contains
+
+| Item | Description |
+| --- | --- |
+| `attendance.db` | The SQLite database, copied with the SQLite online backup API so the copy is consistent even while the service is running. |
+| `embeddings/` | The `.npy` face embedding files. |
+| `manifest.json` | The backup version, creation time, schema version, the SHA-256 checksum of the database, and the list of embedding files. |
+
+A backup does not contain plaintext credentials. Passwords are stored as
+Argon2id hashes and bearer tokens as SHA-256 hashes, so a backup does not
+reveal either. It does contain biometric templates and personal data, so it
+must be stored with the same care as the live data.
+
+### Creating a backup
+
+```bash
+python -m app.database.backup create
+```
+
+The backup is written to a `backups` directory next to the database, in a
+timestamped subdirectory. A backup is never overwritten.
+
+Options:
+
+| Option | Meaning |
+| --- | --- |
+| `--backup-dir` | Directory that holds the backups. |
+| `--database-path` | Database to back up. |
+| `--embedding-dir` | Embedding directory to back up. |
+| `--no-embeddings` | Do not include the face embeddings. |
+
+### Listing and verifying
+
+```bash
+python -m app.database.backup list
+python -m app.database.backup verify --backup-path backups/backup_20260101T120000Z
+```
+
+Verification checks that the manifest is readable, that the database file
+is present, that its SHA-256 checksum matches the manifest, that the
+database passes the SQLite integrity check, that it contains the
+attendance table, and that every embedding listed in the manifest is
+present.
+
+### Restoring
+
+```bash
+python -m app.database.backup restore \
+  --backup-path backups/backup_20260101T120000Z \
+  --overwrite
+```
+
+The restore:
+
+1. verifies the backup before the live database is touched;
+2. refuses to replace an existing database unless `--overwrite` is given;
+3. copies the current database to a `<database>.pre_restore` safety file
+   before replacing it;
+4. restores the embeddings when the backup contains them;
+5. verifies the restored database afterwards.
+
+If the restore fails, the safety copy is put back.
+
+To restore into a new location, omit `--overwrite` and point
+`--database-path` at a path that does not exist yet.
+
+### Recommended schedule
+
+The project does not schedule backups automatically. A minimal schedule:
+
+- before every schema migration;
+- daily, while the service is in use;
+- before any restore or destructive maintenance.
+
+Keep at least one backup outside the machine that runs the service, and
+test a restore periodically. A backup that has never been restored is not
+a backup.

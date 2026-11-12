@@ -75,3 +75,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 - A failing migration no longer leaves a partially applied schema behind. The migration connection uses autocommit mode with an explicit transaction, so DDL is rolled back as well.
+
+### Added
+- `app/database/backup.py` with backup creation, verification, and restore for the attendance database and the face embeddings. The database copy uses the SQLite online backup API so it is consistent while the service runs. Each backup carries a manifest with the schema version, the SHA-256 checksum of the database, and the list of embedding files.
+- `python -m app.database.backup create`, `list`, `verify`, and `restore`.
+- `tests/runtime/test_database_backup.py` covering backup creation, manifest contents, verification refusals, restore, the overwrite refusal, the safety copy, embedding restore, and data integrity after a restore.

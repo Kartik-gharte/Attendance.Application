@@ -188,3 +188,28 @@ Controls that protect the enrollment workflow:
 
 There is no self-service enrollment path and no enrollment audit trail.
 Both remain future work.
+
+## Backups
+
+A backup contains the attendance database and the face embeddings. It is
+therefore a personal-data store and a copy of biometric templates.
+
+Controls that apply to a backup:
+
+- the database copy is created with the SQLite online backup API, so it is
+  consistent and does not capture a half-written transaction;
+- the backup does not contain plaintext credentials. Passwords are stored
+  as Argon2id hashes and bearer tokens as SHA-256 hashes;
+- the backup records a SHA-256 checksum of the database and the schema
+  version, so a truncated or tampered backup is detected by the verify
+  command before it is restored;
+- restoring refuses to replace a live database without an explicit
+  overwrite flag, and always writes a safety copy of the current database
+  first;
+- a restore that fails puts the safety copy back.
+
+A backup is still sensitive. It must be stored with the same access
+controls as the live data, kept only as long as the operational need
+requires, and deleted when it is no longer needed. Backups must not be
+committed to the repository. The `data/` directory is gitignored, and the
+default backup location lives inside it.
