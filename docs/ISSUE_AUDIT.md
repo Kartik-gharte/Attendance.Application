@@ -1,107 +1,114 @@
 # Issue Audit
 
+**As of:** 2026-11-12
+
 ## Repository State
 
-- **Current branch:** `main` at `ab5048f` (HEAD)
-- **All 25 PRs merged** into `main`, most recent: PR #25 (biometric retention, Oct 31 2026)
-- **GitHub CLI:** authenticated as `thenameisomm`
-- **Test suite:** 65 runtime tests pass (`python -m pytest tests/runtime -q`)
-- **Compile check:** `python -m compileall -q app tests` passes
-- **CI:** Workflow merged in PR #22; runs compile, test, and secret-scan on PRs and `main`
+- **Integration branch:** `main`
+- **Test suite:** 196 runtime tests pass (`python -m pytest tests/runtime -q`)
+- **Compile check:** `python -m compileall -q app manual tests` passes
+- **CI:** compile, test, and secret-scan jobs pass on every pull request
+- **Model assets:** provisioned on the development machine; MediaPipe Face Landmarker 3.6 MB, InsightFace `buffalo_l` five ONNX models
+- **Measured baseline:** 2.3 s import, 165 MB resident without models, 1.0 s startup and 986 MB resident with them
 
 ## Total Issues Discovered
 
 | Status | Count |
 |---|---|
-| Completed (acceptance criteria met, integrated, verified) | 7 |
-| Partially completed (some requirements implemented, gaps remain) | 5 |
+| Completed (acceptance criteria met, merged, verified) | 10 |
+| Partially completed (machinery delivered, a remaining blocker) | 2 |
 | Not started | 0 |
-| Implemented but unmerged (exists in unmerged branch/PR) | 0 |
-| Blocked (cannot proceed due to dependencies/resources) | 0 |
+| Implemented but unmerged | 0 |
+| Blocked (cannot proceed due to unavailable resources) | 0 |
 | Needs verification (implementation exists but correctness unproven) | 0 |
 | **Total** | **12** |
 
-## Completed Issues (7) — Acceptance criteria met, merged & verified
+## Completed Issues (10)
 
-| # | Title | PR | Status |
-|---|---|---|---|
-| #1 | [Docs] Establish project foundation and contribution workflow | #1 | Merged; docs + workflow set up |
-| #2 | [P0] Runtime bootstrap: dependencies, configuration, portable models, and startup | #17 | Merged; `requirements.txt`, `config.py`, portable model paths |
-| #3 | [P0] Initialize SQLite schema at startup and make the database path configurable | #18 | Merged; lifespan `initialize_database()`, idempotent schema |
-| #4 | [P0] Add authentication and authorization for attendance and biometric endpoints | #20 | Merged; Argon2id accounts, bearer tokens, role-based access |
-| #5 | [P0] Harden input validation, embedding path containment, uploads, and error responses | #19 | Merged; `validate_student_id()`, `validate_*()` functions, input sanitization |
-| #7 | [P1] Add an automated test suite and required CI checks | #24 | Merged; 19 deterministic service tests + CI workflow |
-| #9 | [P1] Define and implement biometric data retention, deletion, and storage protection | #25 | Merged; `delete_old_attendance()`, `retention_days` config, CLI cleanup |
+| # | Title | Priority | PR | Status |
+|---|---|---|---|---|
+| #2 | [P0] Runtime bootstrap: dependencies, configuration, portable models, and startup | Critical | #17 | Completed |
+| #3 | [P0] Initialize SQLite schema at startup and make the database path configurable | Critical | #18 | Completed |
+| #4 | [P0] Add authentication and authorization for attendance and biometric endpoints | Critical | #20 | Completed |
+| #5 | [P0] Harden input validation, embedding path containment, uploads, and error responses | Critical | #19 | Completed |
+| #6 | [P1] Harden liveness sessions against replay, leakage, and stale state | High | #26 | Completed |
+| #7 | [P1] Add an automated test suite and required CI checks | High | #24 | Completed |
+| #8 | [P1] Replace print logging with structured, redacted logging | High | #29 | Completed |
+| #9 | [P1] Define and implement biometric data retention, deletion, and storage protection | High | #25 | Completed |
+| #10 | [P2] Replace hardcoded enrollment and manual-client scripts with parameterized workflows | Medium | #27, #30 | Completed |
+| #12 | [P2] Add database migrations, backup/restore, health checks, and deployment baseline | Medium | #31, #32, #33, #34 | Completed |
 
-## Partially Completed Issues (5) — Some requirements implemented, gaps remain
+### Verification notes
 
-| # | Title | Priority | Status |
-|---|---|---|---|
-| #6 | [P1] Harden liveness sessions against replay, leakage, and stale state | High | **In progress** (see PR #26 branch `fix/liveness-session-hardening`). Core hardening implemented: `created_at` TTL from session creation, session consumption tracking (pop after use), user binding to authenticated principal. Remaining: moving `session_id` from query string, multi-worker support, and test coverage for expiry/replay/cross-student scenarios. KI-006 partially resolved; KI-012 partially resolved. |
-| #8 | [P1] Replace print logging with structured, redacted logging | High | **Open**; KI-017. `print()` calls throughout codebase; no log levels, no redaction, no policy for what must not appear in logs. |
-| #10 | [P2] Replace hardcoded enrollment and manual-client scripts with parameterized workflows | Medium | **Open**; KI-014, KI-016, KI-019. Scripts hardcode `STU001`, `test.jpg`, Windows paths; no path validation, no overwrite protection, no CLI parameterization. |
-| #11 | [P2] Evaluate face-recognition accuracy and presentation-attack resistance | Medium | **Open**; KI-020. No benchmark, dataset, FAR/FRR measurements, or anti-spoofing evaluation. Heuristic checks only, not a trained PAD model. |
-| #12 | [P2] Add database migrations, backup/restore, health checks, and deployment baseline | Medium | **Open**; no migration tooling, no backup policy, no health checks. |
+- **#6** — `created_at` TTL from session creation, `consumed_at` replay tracking, user binding, and audit logging. KI-006 and KI-012 resolved.
+- **#8** — Logging configured once at startup. A redaction record factory masks bearer tokens, passwords, API keys, UUID session identifiers, and embedding vectors at record creation, so every handler is protected. Log capture tests assert the bearer token, session identifier, and password never reach the log stream. KI-017 resolved.
+- **#10** — PR #27 parameterized `register_face.py`. PR #30 finished `recognize_face.py` and the manual client, removed the Windows paths, added atomic writes and overwrite protection, and added 22 tests.
+- **#12** — Delivered across four pull requests: versioned migrations, backup and restore, health and readiness endpoints, and the deployment baseline with a runbook and a reproducible measurement harness.
 
-## Open Issues Requiring Verification (0)
+## Partially Completed Issues (2)
+
+| # | Title | Priority | PR | Status |
+|---|---|---|---|---|
+| #11 | [P2] Evaluate face-recognition accuracy and presentation-attack resistance | Medium | #35 | The measurement machinery is merged and tested: a versioned dataset description, dataset validation, per-attempt scoring, FAR/FRR/ROC/EER metrics, the liveness success rate, and Wilson intervals. **Blocked on a consented evaluation dataset.** The model assets are not the blocker; they are provisioned and load correctly. KI-020 partially resolved. |
+| #13 | [Tracking] Stabilization backlog: runtime, security, tests, and operations | Medium | — | Metadata tracking issue. Its contents are now covered by the documentation set. |
+
+## Blocked Issues (0)
 
 None.
 
+## Needs Verification (0)
+
+None. Every merged change is covered by an automated test in the runtime suite.
+
 ## Closed Issues with Unfinished Work (0)
 
-None — all closed issues have their acceptance criteria satisfied by merged PRs.
+None.
 
 ## Open Issues That Appear Completed (0)
 
 None.
 
-## Regressions and Missing Tests
+## Corrections Recorded
 
-- No liveness session replay/cross-student tests beyond basic ownership checks
-- No structured logging redaction tests
-- No enrollment parameterization tests
-- No face-recognition accuracy benchmark
-- No migration/backup/deployment tooling
+Two issues were previously reported as complete when the work had not reached `main`. Both are corrected:
 
-## Links to GitHub Issues and PRs
-
-- Issue #6: <https://github.com/Kartik-gharte/Attendance.Application/issues/6>
-- Issue #8: <https://github.com/Kartik-gharte/Attendance.Application/issues/8>
-- Issue #10: <https://github.com/Kartik-gharte/Attendance.Application/issues/10>
-- Issue #11: <https://github.com/Kartik-gharte/Attendance.Application/issues/11>
-- Issue #12: <https://github.com/Kartik-gharte/Attendance.Application/issues/12>
-- Issue #13: <https://github.com/Kartik-gharte/Attendance.Application/issues/13>
-- PR #1: <https://github.com/Kartik-gharte/Attendance.Application/pull/1>
-- PR #7: <https://github.com/Kartik-gharte/Attendance.Application/pull/7>
-- PR #9: <https://github.com/Kartik-gharte/Attendance.Application/pull/9>
-- PR #17: <https://github.com/Kartik-gharte/Attendance.Application/pull/17>
-- PR #18: <https://github.com/Kartik-gharte/Attendance.Application/pull/18>
-- PR #19: <https://github.com/Kartik-gharte/Attendance.Application/pull/19>
-- PR #20: <https://github.com/Kartik-gharte/Attendance.Application/pull/20>
-- PR #24: <https://github.com/Kartik-gharte/Attendance.Application/pull/24>
-- PR #25: <https://github.com/Kartik-gharte/Attendance.Application/pull/25>
+| Issue | What was wrong | Correction |
+|---|---|---|
+| #8 | Closed on GitHub with no code committed. `main` still had 30 `print()` calls in `app/api/routes.py`. | Reopened, implemented on `fix/structured-logging-clean`, merged as PR #29. |
+| #10 | Closed on GitHub after PR #27 landed only half the work. `recognize_face.py` and the manual client still hardcoded values. | PR #30 completed the work and merged it. |
 
 ## Known Issue Mapping
 
-| KI-ID | Issue | Resolution Status |
+| KI-ID | Issue | Status |
 |---|---|---|
-| KI-001 | Empty dependency manifest | Resolved (#1) |
-| KI-002 | Hardcoded Windows model path | Resolved (#2, #17) |
-| KI-003 | Database schema never initialized | Resolved (#3, #18) |
-| KI-004 | No authentication or authorization | Resolved (#4, #20) |
-| KI-005 | student_id used in filesystem path without validation | Resolved (#5, #19) |
-| KI-006 | Liveness sessions bearer-like and replayable | **Partially resolved**; issue #6 open |
-| KI-007 | No upload size/type limits or domain validation | Resolved (#5, #19) |
-| KI-008 | No automated test suite | Resolved (#7, #24) |
-| KI-009 | No configuration system | Resolved (#2, #17) |
-| KI-010 | Error messages expose internal details | Resolved (#5, #19) |
-| KI-011 | No retention, deletion, encryption, or backup policy | Partially resolved (#25); function and config exist, CLI and docs pending |
-| KI-012 | In-memory sessions per-process, never cleaned up | **Open**; related to issue #6 |
-| KI-013 | Models loaded twice at import | Resolved (lifespan) |
-| KI-014 | Broken test import | Partially resolved; root scripts moved to `manual/` |
-| KI-015 | Missing fixtures and model assets | Resolved; deterministic tests use synthetic fixtures |
-| KI-016 | Registration and client paths/IDs are hardcoded | **Open**; related to issue #10 |
-| KI-017 | Logs contain personal data and use `print()` | **Open**; related to issue #8 |
-| KI-018 | No CI or verified branch protection | Partially resolved; CI workflow merged, branch protection not configured |
-| KI-019 | Dead/duplicate code paths and scripts | **Open**; related to issue #10 |
-| KI-020 | Anti-spoofing effectiveness is unmeasured | **Open**; related to issue #11 |
+| KI-001 | Empty dependency manifest | Resolved |
+| KI-002 | Hardcoded Windows model path | Resolved |
+| KI-003 | Database schema never initialized | Resolved |
+| KI-004 | No authentication or authorization | Resolved |
+| KI-005 | `student_id` used in filesystem path without validation | Resolved |
+| KI-006 | Liveness sessions bearer-like and replayable | Resolved |
+| KI-007 | No upload size/type limits or domain validation | Resolved |
+| KI-008 | No automated test suite | Resolved |
+| KI-009 | No configuration system | Resolved |
+| KI-010 | Error messages expose internal details | Resolved |
+| KI-011 | No retention, deletion, encryption, or backup policy | Resolved — retention function, retention config, CLI cleanup, and the backup and restore workflow |
+| KI-012 | In-memory sessions per-process and never cleaned up | Resolved |
+| KI-013 | Models loaded twice at import | Resolved |
+| KI-014 | Broken import in `test_liveness_service.py` | Resolved |
+| KI-015 | Missing fixtures and model assets | Resolved |
+| KI-016 | Registration and client paths/IDs are hardcoded | Resolved |
+| KI-017 | Logs contain personal data and use `print()` | Resolved |
+| KI-018 | No CI or verified branch protection | Partially resolved — CI merged and passing; branch protection still requires owner action |
+| KI-019 | Dead/duplicate code paths and scripts | Partially resolved — the hardcoded scripts were replaced and the duplicate broken test module removed; an unused-method pass remains |
+| KI-020 | Anti-spoofing effectiveness is unmeasured | Partially resolved — the evaluation harness is merged and tested; blocked on a consented dataset |
+
+## Links
+
+### Issues
+[#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2) · [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3) · [#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4) · [#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5) · [#6](https://github.com/Kartik-gharte/Attendance.Application/issues/6) · [#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7) · [#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8) · [#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9) · [#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10) · [#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11) · [#12](https://github.com/Kartik-gharte/Attendance.Application/issues/12) · [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13)
+
+### Pull requests
+[#17](https://github.com/Kartik-gharte/Attendance.Application/pull/17) · [#18](https://github.com/Kartik-gharte/Attendance.Application/pull/18) · [#19](https://github.com/Kartik-gharte/Attendance.Application/pull/19) · [#20](https://github.com/Kartik-gharte/Attendance.Application/pull/20) · [#24](https://github.com/Kartik-gharte/Attendance.Application/pull/24) · [#25](https://github.com/Kartik-gharte/Attendance.Application/pull/25) · [#26](https://github.com/Kartik-gharte/Attendance.Application/pull/26) · [#27](https://github.com/Kartik-gharte/Attendance.Application/pull/27) · [#29](https://github.com/Kartik-gharte/Attendance.Application/pull/29) · [#30](https://github.com/Kartik-gharte/Attendance.Application/pull/30) · [#31](https://github.com/Kartik-gharte/Attendance.Application/pull/31) · [#32](https://github.com/Kartik-gharte/Attendance.Application/pull/32) · [#33](https://github.com/Kartik-gharte/Attendance.Application/pull/33) · [#34](https://github.com/Kartik-gharte/Attendance.Application/pull/34) · [#35](https://github.com/Kartik-gharte/Attendance.Application/pull/35)
+
+### Superseded pull request
+[#28](https://github.com/Kartik-gharte/Attendance.Application/pull/28) — closed without merging. The secret scan flagged credential-shaped literals in the redaction tests. Replacing it would have required rewriting published history, so the work was redone on a clean branch as PR #29.
