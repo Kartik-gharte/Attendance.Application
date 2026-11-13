@@ -51,9 +51,9 @@
 | Configuration | Implemented, verified | `app/core/config.py` with `pydantic-settings`; environment and `.env` overrides tested. |
 | Model startup | Implemented, verified | One MediaPipe and one InsightFace instance created in the lifespan; missing MediaPipe model fails startup with an actionable error. |
 | Liveness start/frame API | Implemented, verified | `POST /liveness/start`, `POST /liveness/frame`; in-memory sessions with a TTL from creation, one-time consumption, and user binding. |
-| Blink liveness | Implemented, unverified | MediaPipe landmarks + EAR threshold; accuracy untested. The model asset is provisioned and loads. |
+| Blink liveness | Implemented, partially verified | MediaPipe landmarks + EAR threshold. The real model asset is provisioned, loads, and runs on a real frame. The blink detection itself is untested, because it needs a real face. |
 | Anti-spoofing screening | Implemented, unverified | Heuristic size/brightness/sharpness checks; not a trained PAD model. Effectiveness unmeasured. |
-| Face embedding/recognition | Implemented, unverified | InsightFace `buffalo_l`, cosine similarity, configurable threshold; accuracy untested. The model asset is provisioned and loads. |
+| Face embedding/recognition | Implemented, partially verified | InsightFace `buffalo_l`, cosine similarity, configurable threshold. The real model asset is provisioned, loads, and runs on a real image. A successful match is untested, because it needs a real consented face. |
 | Attendance verification API | Implemented, partially verified | `POST /attendance/verify`; success, duplicate, validation, upload-limit, authentication, ownership, and retrieval-error paths tested with a temporary database and fake model services. Real model flow unverified. |
 | Attendance retrieval API | Implemented, verified without models | `GET /attendance/student/{student_id}` and `GET /attendance/all` return empty lists on a fresh initialized database. Students can read only their own records; admins can read all records. |
 | Authentication/authorization | Implemented, verified with temporary storage | Local Argon2id accounts, opaque bearer tokens with expiry/revocation, student/admin roles, and user-bound liveness sessions. Tested without real models. |
@@ -100,6 +100,7 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 19. The evaluation harness was merged in PR #35. The runner was verified to refuse a missing dataset and an invalid dataset with a nonzero exit code.
 20. The real biometric model assets were verified to load: MediaPipe Face Landmarker and InsightFace `buffalo_l` both initialize, with a measured startup of 1.0 s and 986 MB resident memory.
 21. CI passed on PRs #29, #30, #31, #32, #33, #34, #35, #37, #38, #39, and #40. The `Compile and test` and `Secret scan` jobs passed on every one.
+22. The real biometric models were verified to load and to run the actual pipeline. The MediaPipe Face Landmarker and InsightFace both initialize, the liveness path executes on a real frame, the InsightFace detector exhausts its five detection strategies on a real image, and the attendance endpoint rejects an image with no face and stores no record. The same checks run as an automated test when the assets are provisioned, and are skipped otherwise.
 22. The backup retention policy was merged in PR #37. The age limit, the count limit, the rule that the newest backup is always kept, and the guard against deleting an unrelated directory were verified.
 23. The enrollment audit trail was merged in PR #38. It was verified that no embedding value reaches the trail, that the source path is reduced to its file name, and that the enrollment outcomes are recorded.
 24. The cleanup command fix was merged in PR #39. The old behaviour was confirmed first: the command exited successfully and deleted nothing.
@@ -109,6 +110,7 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 
 - Startup on Windows, Linux, or any Python version other than 3.11.16.
 - Any liveness, anti-spoofing, or face-matching accuracy. The evaluation machinery is implemented and tested, but no consented dataset exists, so no measurement has been made.
+- A successful face match. The real-model pipeline verification exercises the rejection path with the real models; the acceptance path needs a real consented face.
 - Face-recognition accuracy, false-accept/false-reject rates, or anti-spoofing effectiveness.
 - The attendance verification path under load with real faces.
 - Webcam client behavior with a real camera.

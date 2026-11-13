@@ -140,3 +140,41 @@ Temporary-database and fake-model-service API/database/auth coverage now exists,
 - Registered embeddings for the test student.
 - Synthetic or explicitly consented test images.
 - Do not commit real biometric data, even as test fixtures.
+
+## Verifying the pipeline against the real models
+
+The runtime suite uses fake model services, so that it runs without the
+model assets and without a camera. `manual/verify_model_pipeline.py` covers
+the other half: it loads the real MediaPipe and InsightFace models and
+drives the actual pipeline.
+
+```bash
+python -m manual.verify_model_pipeline
+```
+
+The script exits nonzero when the pipeline does not behave as expected,
+so it can be used as a check. It verifies that:
+
+- both real models load and initialize;
+- the MediaPipe Face Landmarker runs on a real frame without error;
+- the InsightFace detector runs on a real image without error;
+- the pipeline rejects an image that contains no face, instead of
+  accepting it;
+- the attendance path stores nothing when the face does not match.
+
+The same checks run as an automated test when the model assets are
+provisioned:
+
+```bash
+python -m pytest tests/runtime/test_real_model_pipeline.py
+```
+
+They are skipped when the assets are not present, which is the case in
+CI.
+
+### What this cannot cover
+
+A successful match needs a real consented face, and no such image exists
+yet. The verification therefore covers the rejection path with the real
+models, not the acceptance path. The requirements for the dataset are in
+[EVALUATION_DATASET_POLICY.md](EVALUATION_DATASET_POLICY.md).
