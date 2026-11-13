@@ -169,6 +169,7 @@ name, and the time it was applied.
 | Version | Name | Change |
 | --- | --- | --- |
 | 1 | `initial_schema` | Creates the `attendance`, `users`, and `auth_tokens` tables and their indexes. |
+| 2 | `enrollment_audit` | Creates the `enrollment_audit` table and its indexes. |
 
 ### Applying migrations
 
@@ -212,6 +213,43 @@ Both commands accept `--database-path` and default to the configured
    has the previous version, and so that it is safe to re-run.
 4. Add a test that covers the fresh path, the upgrade path from the
    previous version, and the failure path.
+
+## Enrollment audit trail
+
+Enrolling a face writes a biometric template. The `enrollment_audit` table
+records that it happened.
+
+| Column | Meaning |
+| --- | --- |
+| `id` | Row identifier. |
+| `student_id` | The student the template belongs to. |
+| `enrolled_at` | When the enrollment happened, in UTC. |
+| `operator` | The person who performed the enrollment. |
+| `consent_reference` | The record that the person's consent was obtained. |
+| `source_name` | The source image file name. The path is not recorded. |
+| `embedding_digest` | A SHA-256 digest that identifies the stored template. |
+| `outcome` | `enrolled`, `rejected`, or `failed`. |
+| `detail` | A short reason. Bounded in length. |
+
+The table deliberately holds no biometric material. There is no image, no
+embedding, and no face crop. The embedding is identified by a digest, so a
+specific template can be traced without the template being readable from
+the audit trail.
+
+Because it holds a student identifier, the audit trail is personal data
+and is subject to the same retention rule as the attendance records.
+
+Reading the audit trail:
+
+```python
+from app.services.enrollment_audit import list_enrollments
+
+for entry in list_enrollments(student_id="STU001"):
+    print(entry.enrolled_at, entry.operator, entry.outcome)
+```
+
+Old entries are removed with `delete_old_enrollment_audit()`, which applies
+the configured `RETENTION_DAYS`.
 
 ## Backup and restore
 

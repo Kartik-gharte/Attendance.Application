@@ -246,13 +246,21 @@ python -m app.services.register_face \
   --dry-run
 ```
 
-Then perform the enrollment:
+Then perform the enrollment. Record the operator and the consent
+reference, so that the enrollment can be traced:
 
 ```bash
 python -m app.services.register_face \
   --student-id STU001 \
-  --image /path/to/consented-image.jpg
+  --image /path/to/consented-image.jpg \
+  --operator "your-username" \
+  --consent-reference "consent-record-2026-001"
 ```
+
+The enrollment is written to the `enrollment_audit` table with the
+operator, the time, and the consent reference. The audit trail holds no
+biometric material. A dry run is never audited, because nothing was
+enrolled.
 
 The command refuses to replace an existing embedding. Replacing one is a
 destructive operation, because the student can no longer be verified against
@@ -274,6 +282,10 @@ Options:
 | `--output-dir` | Destination directory. Must stay inside the configured embedding directory. |
 | `--overwrite` | Replace an existing embedding. |
 | `--dry-run` | Validate the request without writing a file. |
+| `--operator` | The person performing the enrollment. Recorded in the audit trail. |
+| `--consent-reference` | The record that the person's consent was obtained. Recorded in the audit trail. |
+| `--database-path` | Database the audit entry is written to. |
+| `--no-audit` | Do not record an audit entry. |
 
 The embedding is written to a temporary file in the destination directory
 and moved into place only after it is complete, so a failed enrollment never

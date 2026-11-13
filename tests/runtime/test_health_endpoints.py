@@ -277,14 +277,11 @@ def test_readiness_reports_a_pending_migration(tmp_path):
 
     with TestClient(context.app) as client:
 
-        # The startup migrates the database, so the version record is
+        # The startup migrates the database, so the version records are
         # removed afterwards to simulate a database that is behind.
         connection = sqlite3.connect(str(context.database_path))
         try:
-            connection.execute(
-                "DELETE FROM schema_migrations WHERE version = ?",
-                (SCHEMA_VERSION,),
-            )
+            connection.execute("DELETE FROM schema_migrations")
             connection.commit()
         finally:
             connection.close()
