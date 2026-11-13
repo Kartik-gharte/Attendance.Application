@@ -30,7 +30,7 @@ import json
 import shutil
 import sqlite3
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.core.config import get_settings
@@ -130,6 +130,136 @@ def list_backups(backup_dir=None) -> list[Path]:
     )
 
 
+def parse_backup_timestamp(path: Path) -> datetime | None:
+    """Return the creation time encoded in a backup directory name.
+
+    Returns ``None`` when the directory name does not follow the backup
+    naming convention, which is how a directory that is not a backup is
+    told apart from one that is.
+    """
+
+    name = path.name
+
+    if not name.startswith("backup_"):
+        return None
+
+    stamp = name[len("backup_"):]
+
+    try:
+        return datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(
+            tzinfo=timezone.utc
+        )
+
+    except ValueError:
+        return None
+
+
+def prune_backups(
+    backup_dir=None,
+    retention_days: int | None = None,
+    max_count: int | None = None,
+    dry_run: bool = False,
+) -> list[Path]:
+    """Delete backups that are past the retention policy.
+
+    Two limits apply independently, and a backup is removed when it
+    exceeds either one:
+
+    - the age limit: a backup older than ``retention_days`` is removed;
+    - the count limit: a backup outside the newest ``max_count`` backups
+      is removed.
+
+    The newest backup is always kept. A policy that is configured too
+    aggressively therefore cannot empty the backup directory.
+
+    Only directories that follow the backup naming convention and contain a
+    manifest are considered. An unrelated directory in the backup root is
+    never deleted.
+
+    Args:
+        backup_dir: Directory that holds the backups.
+        retention_days: Keep backups newer than this many days.
+        max_count: Keep at most this many backups.
+        dry_run: Report what would be deleted without deleting it.
+
+    Returns:
+        The list of removed backup directories. Empty for a dry run.
+    """
+
+    settings = get_settings()
+
+    if retention_days is None:
+        retention_days = settings.backup_retention_days
+
+    if max_count is None:
+        max_count = settings.backup_retention_count
+
+    root = (
+        Path(backup_dir)
+        if backup_dir is not None
+        else _default_backup_dir()
+    )
+
+    if not root.is_dir():
+        return []
+
+    candidates = []
+
+    for entry in root.iterdir():
+
+        if not entry.is_dir():
+            continue
+
+        if not (entry / MANIFEST_NAME).is_file():
+            continue
+
+        created_at = parse_backup_timestamp(entry)
+
+        if created_at is None:
+            continue
+
+        candidates.append((created_at, entry))
+
+    # Newest first.
+    candidates.sort(key=lambda item: item[0], reverse=True)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+
+    to_remove = []
+
+    for index, (created_at, entry) in enumerate(candidates):
+
+        # The newest backup is always kept, so the policy can never
+        # destroy every backup.
+        if index == 0:
+            continue
+
+        exceeds_age = created_at < cutoff
+        exceeds_count = index >= max_count
+
+        if exceeds_age or exceeds_count:
+            to_remove.append(entry)
+
+    removed = []
+
+    for entry in to_remove:
+
+        if dry_run:
+            logger.info(
+                "Would prune expired backup: %s",
+                entry,
+            )
+            continue
+
+        shutil.rmtree(entry, ignore_errors=True)
+
+        logger.info("Pruned expired backup: %s", entry)
+
+        removed.append(entry)
+
+    return removed
+
+
 def _current_schema_version(database_path: Path) -> int:
     from app.database.migrations import get_current_schema_version
 
@@ -149,6 +279,7 @@ def create_backup(
     database_path=None,
     embedding_dir=None,
     include_embeddings: bool = True,
+    prune: bool | None = None,
 ) -> Path:
     """Create a backup and return the path of the backup directory.
 
@@ -160,6 +291,8 @@ def create_backup(
         embedding_dir: Embedding directory to back up. Defaults to the
             configured embedding directory.
         include_embeddings: Whether to include the face embeddings.
+        prune: Whether to prune expired backups afterwards. Defaults to
+            the configured value.
 
     Returns:
         The path of the created backup directory.
@@ -232,6 +365,14 @@ def create_backup(
         backup_path,
         manifest.embedding_count,
     )
+
+    if prune is None:
+        prune = get_settings().backup_prune_on_create
+
+    if prune:
+        # The new backup is the newest one, so the retention policy always
+        # keeps it.
+        prune_backups(backup_dir=target_root)
 
     return backup_path
 
@@ -571,7 +712,7 @@ def build_parser():
 
     parser.add_argument(
         "command",
-        choices=["create", "list", "verify", "restore"],
+        choices=["create", "list", "verify", "restore", "prune"],
         help="Operation to perform",
     )
     parser.add_argument(
@@ -604,6 +745,30 @@ def build_parser():
         action="store_true",
         help="Allow the restore to replace an existing database",
     )
+    parser.add_argument(
+        "--retention-days",
+        type=int,
+        default=None,
+        help="Keep backups newer than this many days "
+        "(defaults to the configured value)",
+    )
+    parser.add_argument(
+        "--max-count",
+        type=int,
+        default=None,
+        help="Keep at most this many backups "
+        "(defaults to the configured value)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what would be pruned without deleting it",
+    )
+    parser.add_argument(
+        "--no-prune",
+        action="store_true",
+        help="Do not prune expired backups after creating the backup",
+    )
 
     return parser
 
@@ -629,6 +794,7 @@ def main(argv=None) -> int:
                 database_path=args.database_path,
                 embedding_dir=args.embedding_dir,
                 include_embeddings=not args.no_embeddings,
+                prune=not args.no_prune,
             )
 
             logger.info("Backup created at %s", path)
@@ -670,6 +836,26 @@ def main(argv=None) -> int:
                 manifest.schema_version,
                 manifest.embedding_count,
             )
+
+            return 0
+
+        if args.command == "prune":
+
+            removed = prune_backups(
+                backup_dir=args.backup_dir,
+                retention_days=args.retention_days,
+                max_count=args.max_count,
+                dry_run=args.dry_run,
+            )
+
+            if args.dry_run:
+                logger.info(
+                    "Dry run: %s backup(s) would be pruned",
+                    len(removed),
+                )
+
+            else:
+                logger.info("Pruned %s backup(s)", len(removed))
 
             return 0
 
