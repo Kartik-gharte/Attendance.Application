@@ -1,11 +1,11 @@
 # Issue Audit
 
-**As of:** 2026-11-12
+**As of:** 2026-11-13
 
 ## Repository State
 
 - **Integration branch:** `main`
-- **Test suite:** 196 runtime tests pass (`python -m pytest tests/runtime -q`)
+- **Test suite:** 258 runtime tests pass (`python -m pytest tests/runtime -q`)
 - **Compile check:** `python -m compileall -q app manual tests` passes
 - **CI:** compile, test, and secret-scan jobs pass on every pull request
 - **Model assets:** provisioned on the development machine; MediaPipe Face Landmarker 3.6 MB, InsightFace `buffalo_l` five ONNX models
@@ -68,6 +68,17 @@ None.
 
 None.
 
+## Follow-Up Work Delivered (not tracked by an issue)
+
+These came out of the audit of the remaining gaps. Each is a separate, focused pull request.
+
+| Work | PR | Summary |
+|---|---|---|
+| Backup retention policy | #37 | Old backups are pruned by age and count, so copies of biometric templates do not accumulate. |
+| Enrollment audit trail | #38 | Every enrollment is recorded with the operator and the consent reference. The trail holds no biometric material. |
+| Dead code removal and the cleanup command fix | #39 | `attendance_already_marked()` was deleted, the unused imports were removed, and the `app auth cleanup` command now actually deletes. |
+| Metrics endpoint | #40 | Operational metrics in the Prometheus text format, with route labels that cannot contain personal data. |
+
 ## Corrections Recorded
 
 Two issues were previously reported as complete when the work had not reached `main`. Both are corrected:
@@ -91,7 +102,7 @@ Two issues were previously reported as complete when the work had not reached `m
 | KI-008 | No automated test suite | Resolved |
 | KI-009 | No configuration system | Resolved |
 | KI-010 | Error messages expose internal details | Resolved |
-| KI-011 | No retention, deletion, encryption, or backup policy | Resolved — retention function, retention config, CLI cleanup, and the backup and restore workflow |
+| KI-011 | No retention, deletion, encryption, or backup policy | **Partially resolved.** Retention, deletion, the backup and restore workflow, the backup retention policy, and the enrollment audit retention are implemented. Backups are still not encrypted at rest and there is no automatic backup schedule. |
 | KI-012 | In-memory sessions per-process and never cleaned up | Resolved |
 | KI-013 | Models loaded twice at import | Resolved |
 | KI-014 | Broken import in `test_liveness_service.py` | Resolved |
@@ -99,7 +110,7 @@ Two issues were previously reported as complete when the work had not reached `m
 | KI-016 | Registration and client paths/IDs are hardcoded | Resolved |
 | KI-017 | Logs contain personal data and use `print()` | Resolved |
 | KI-018 | No CI or verified branch protection | Partially resolved — CI merged and passing; branch protection still requires owner action |
-| KI-019 | Dead/duplicate code paths and scripts | Partially resolved — the hardcoded scripts were replaced and the duplicate broken test module removed; an unused-method pass remains |
+| KI-019 | Dead/duplicate code paths and scripts | **Resolved.** The hardcoded scripts were replaced, the duplicate broken test module was removed, the unused `attendance_already_marked()` was deleted, and the unused imports were removed. The scan also uncovered the `app auth cleanup` command silently doing nothing, which is now fixed. |
 | KI-020 | Anti-spoofing effectiveness is unmeasured | Partially resolved — the evaluation harness is merged and tested; blocked on a consented dataset |
 
 ## Links
@@ -108,7 +119,7 @@ Two issues were previously reported as complete when the work had not reached `m
 [#2](https://github.com/Kartik-gharte/Attendance.Application/issues/2) · [#3](https://github.com/Kartik-gharte/Attendance.Application/issues/3) · [#4](https://github.com/Kartik-gharte/Attendance.Application/issues/4) · [#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5) · [#6](https://github.com/Kartik-gharte/Attendance.Application/issues/6) · [#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7) · [#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8) · [#9](https://github.com/Kartik-gharte/Attendance.Application/issues/9) · [#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10) · [#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11) · [#12](https://github.com/Kartik-gharte/Attendance.Application/issues/12) · [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13)
 
 ### Pull requests
-[#17](https://github.com/Kartik-gharte/Attendance.Application/pull/17) · [#18](https://github.com/Kartik-gharte/Attendance.Application/pull/18) · [#19](https://github.com/Kartik-gharte/Attendance.Application/pull/19) · [#20](https://github.com/Kartik-gharte/Attendance.Application/pull/20) · [#24](https://github.com/Kartik-gharte/Attendance.Application/pull/24) · [#25](https://github.com/Kartik-gharte/Attendance.Application/pull/25) · [#26](https://github.com/Kartik-gharte/Attendance.Application/pull/26) · [#27](https://github.com/Kartik-gharte/Attendance.Application/pull/27) · [#29](https://github.com/Kartik-gharte/Attendance.Application/pull/29) · [#30](https://github.com/Kartik-gharte/Attendance.Application/pull/30) · [#31](https://github.com/Kartik-gharte/Attendance.Application/pull/31) · [#32](https://github.com/Kartik-gharte/Attendance.Application/pull/32) · [#33](https://github.com/Kartik-gharte/Attendance.Application/pull/33) · [#34](https://github.com/Kartik-gharte/Attendance.Application/pull/34) · [#35](https://github.com/Kartik-gharte/Attendance.Application/pull/35)
+[#17](https://github.com/Kartik-gharte/Attendance.Application/pull/17) · [#18](https://github.com/Kartik-gharte/Attendance.Application/pull/18) · [#19](https://github.com/Kartik-gharte/Attendance.Application/pull/19) · [#20](https://github.com/Kartik-gharte/Attendance.Application/pull/20) · [#24](https://github.com/Kartik-gharte/Attendance.Application/pull/24) · [#25](https://github.com/Kartik-gharte/Attendance.Application/pull/25) · [#26](https://github.com/Kartik-gharte/Attendance.Application/pull/26) · [#27](https://github.com/Kartik-gharte/Attendance.Application/pull/27) · [#29](https://github.com/Kartik-gharte/Attendance.Application/pull/29) · [#30](https://github.com/Kartik-gharte/Attendance.Application/pull/30) · [#31](https://github.com/Kartik-gharte/Attendance.Application/pull/31) · [#32](https://github.com/Kartik-gharte/Attendance.Application/pull/32) · [#33](https://github.com/Kartik-gharte/Attendance.Application/pull/33) · [#34](https://github.com/Kartik-gharte/Attendance.Application/pull/34) · [#35](https://github.com/Kartik-gharte/Attendance.Application/pull/35) · [#37](https://github.com/Kartik-gharte/Attendance.Application/pull/37) · [#38](https://github.com/Kartik-gharte/Attendance.Application/pull/38) · [#39](https://github.com/Kartik-gharte/Attendance.Application/pull/39) · [#40](https://github.com/Kartik-gharte/Attendance.Application/pull/40)
 
 ### Superseded pull request
 [#28](https://github.com/Kartik-gharte/Attendance.Application/pull/28) — closed without merging. The secret scan flagged credential-shaped literals in the redaction tests. Replacing it would have required rewriting published history, so the work was redone on a clean branch as PR #29.

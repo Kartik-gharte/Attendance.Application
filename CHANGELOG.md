@@ -136,3 +136,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 - A student identifier can no longer reach the metrics. The route label is the route template, and a path that matches no route is labelled `unmatched` rather than recorded verbatim.
+
+### Changed
+- `docs/ISSUE_AUDIT.md`, `docs/ISSUE_BACKLOG.md`, and `docs/PROJECT_STATUS.md` updated to the verified state after PRs #37, #38, #39, and #40. The test count is now 258, and the follow-up work that was delivered is recorded with its pull request.

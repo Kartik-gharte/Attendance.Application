@@ -1,6 +1,6 @@
 # Project Status
 
-**As of:** 2026-11-12
+**As of:** 2026-11-13
 
 ## Repository state
 
@@ -21,11 +21,15 @@
 | Health and readiness endpoints | Merged via PR #33 |
 | Deployment baseline and runbook | Merged via PR #34 |
 | Evaluation harness | Merged via PR #35 |
+| Backup retention policy | Merged via PR #37 |
+| Enrollment audit trail | Merged via PR #38 |
+| Dead code removal and the cleanup command fix | Merged via PR #39 |
+| Metrics endpoint | Merged via PR #40 |
 | Remote branches | `main` plus merged topic branches; no branch is deleted |
 | Local backups | `refs/backup/feature-ai-attendance-security`, `refs/backup/feature-attendance-verification-stable`, `refs/backup/main-before-attendance-merge-2026-10-26`, `refs/backup/main-initial` |
 | Open stabilization backlog | [#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11) and [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13) |
 | CI | Compile, test, and secret-scan jobs pass on every pull request; branch protection is not configured |
-| Test suite | 196 runtime tests exist under `tests/runtime/` |
+| Test suite | 258 runtime tests exist under `tests/runtime/` |
 | Model assets | Provisioned on the development machine; MediaPipe Face Landmarker and InsightFace `buffalo_l` both load correctly |
 | Measured baseline | 2.3 s import, 165 MB resident without models, 1.0 s startup and 986 MB resident with them |
 
@@ -65,9 +69,9 @@
 | Evaluation harness | Implemented, verified | Dataset validation, FAR/FRR/ROC/EER, liveness success rate, and Wilson intervals. No accuracy figure has been produced. |
 | Syntax check | Verified | `python -m compileall -q app tests` passed. |
 | Lint/type checks | Not configured | No verified tool configuration exists. |
-| Observability | Partial | Structured, leveled, redacted logging with a configurable level and format. No metrics, tracing, or alerting. |
+| Observability | Partial | Structured, leveled, redacted logging with a configurable level and format. Metrics are exposed in the Prometheus text format with route labels that cannot contain personal data. No tracing and no alerting. |
 | CI | Implemented, verified | Compile, runtime tests, and gitleaks run on pull requests and `main`; both jobs passed on PR #22. Branch protection still requires owner action. |
-| Privacy controls | Partial | Git ignores biometric, account, token, and attendance data. Retention, deletion, backup, and restore are implemented. No consent workflow and no enrollment audit trail. |
+| Privacy controls | Partial | Git ignores biometric, account, token, and attendance data. Retention, deletion, backup and restore, backup retention, and an enrollment audit trail are implemented. The consent reference points at a record kept outside the application. |
 | Deployment | Partial | Requirements, constraints, probes, a measured baseline, and a runbook are documented. No container image, service unit, or reverse-proxy configuration. |
 | Project documentation | In progress | Runtime, database, configuration, API, security, authentication, and validation docs updated for the current implementation. |
 
@@ -76,7 +80,7 @@
 On macOS 27.0.1 arm64 with Python 3.11.16:
 
 1. Clean virtual environment installed all runtime dependencies from `requirements.txt`, including `argon2-cffi`.
-2. `python -m pytest tests/runtime -q` passed (196 tests), including validation, upload-limit, retrieval-error, login/logout, token expiry/revocation, role, cross-student access, log redaction, schema migration and rollback, backup and restore, health and readiness, and the enrollment workflow.
+2. `python -m pytest tests/runtime -q` passed (258 tests), including validation, upload-limit, retrieval-error, login/logout, token expiry/revocation, role, cross-student access, log redaction, schema migration and rollback, backup and restore, backup retention, health and readiness, the enrollment workflow, the enrollment audit trail, the metrics, the evaluation harness, and the authentication command line.
 3. `python -m uvicorn app.main:app` reached "Application startup complete" against a temporary database.
 4. `GET /` and `GET /docs` returned `200`; the real server issued a login token, `GET /auth/me` returned the student account, and an unauthenticated `GET /attendance/all` returned `401`.
 5. A temporary configured database was created with the `attendance`, `users`, and `auth_tokens` tables during startup; restart preserved an inserted attendance row.
@@ -95,7 +99,11 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 18. The deployment baseline was merged in PR #34. The harness was executed and produced the recorded numbers.
 19. The evaluation harness was merged in PR #35. The runner was verified to refuse a missing dataset and an invalid dataset with a nonzero exit code.
 20. The real biometric model assets were verified to load: MediaPipe Face Landmarker and InsightFace `buffalo_l` both initialize, with a measured startup of 1.0 s and 986 MB resident memory.
-21. CI passed on PRs #29, #30, #31, #32, #33, #34, and #35. The `Compile and test` and `Secret scan` jobs passed on every one.
+21. CI passed on PRs #29, #30, #31, #32, #33, #34, #35, #37, #38, #39, and #40. The `Compile and test` and `Secret scan` jobs passed on every one.
+22. The backup retention policy was merged in PR #37. The age limit, the count limit, the rule that the newest backup is always kept, and the guard against deleting an unrelated directory were verified.
+23. The enrollment audit trail was merged in PR #38. It was verified that no embedding value reaches the trail, that the source path is reduced to its file name, and that the enrollment outcomes are recorded.
+24. The cleanup command fix was merged in PR #39. The old behaviour was confirmed first: the command exited successfully and deleted nothing.
+25. The metrics endpoint was merged in PR #40. A request to `/attendance/student/SECRETSTUDENT42` was verified to produce the label `/attendance/student/{student_id}`, with the identifier absent from the output.
 
 ## What was not verified
 
