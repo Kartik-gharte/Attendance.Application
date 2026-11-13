@@ -6,7 +6,6 @@ overwrite refusal, atomic writes, and the argument parsing of the manual
 client.
 """
 
-import argparse
 import importlib
 import sys
 

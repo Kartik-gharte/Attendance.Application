@@ -9,7 +9,6 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings

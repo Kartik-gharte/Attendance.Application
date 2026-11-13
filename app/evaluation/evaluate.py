@@ -14,7 +14,6 @@ when a consented dataset is supplied.
 """
 
 import argparse
-import json
 from pathlib import Path
 
 from app.core.config import get_settings

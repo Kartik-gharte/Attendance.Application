@@ -4,10 +4,7 @@ These tests use an in‑memory SQLite database and do not require a
 camera or model assets.
 """
 
-import sqlite3
-import tempfile
 
-import pytest
 
 from app.database.attendance_db import (
     delete_old_attendance,
@@ -117,8 +114,6 @@ def test_fresh_database_retrieval_returns_empty(tmp_path):
 def test_delete_old_attendance(tmp_path):
     """Delete old attendance records based on retention policy."""
     import tempfile
-    from pathlib import Path
-    from datetime import datetime, timedelta
 
     db_path = tmp_path / "attendance.db"
     initialize_database(db_path)

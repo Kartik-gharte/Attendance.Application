@@ -4,9 +4,7 @@ These tests use synthetic BGR images and normalized landmark objects;
 no MediaPipe or actual camera is required.
 """
 
-import cv2
 import numpy as np
-import pytest
 
 from app.services.anti_spoofing import AntiSpoofingService
 

@@ -12,7 +12,6 @@ developer machine and are not a capacity guarantee.
 """
 
 import argparse
-import os
 import statistics
 import sys
 import tempfile

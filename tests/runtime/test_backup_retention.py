@@ -5,22 +5,17 @@ the age limit. These tests cover both limits, the safety rules, and the
 command line interface.
 """
 
-import os
-import time
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from app.database import backup as backup_module
 from app.database.backup import (
     MANIFEST_NAME,
-    BackupError,
     create_backup,
     list_backups,
     parse_backup_timestamp,
     prune_backups,
-    verify_backup,
 )
 
 
