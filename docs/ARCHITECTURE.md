@@ -271,3 +271,53 @@ The endpoints are unauthenticated so that a supervisor or a load balancer
 can reach them. They expose only operational status. A test asserts that
 no student identifier, subject, lecture identifier, credential, database
 path, or embedding directory appears in the responses.
+
+## Metrics
+
+The service exposes operational metrics in the Prometheus text exposition
+format. No third-party library is used, so the dependency manifest does not
+grow for the sake of observability.
+
+```
+request
+  -> metrics middleware
+       -> resolve the route template from the request path
+       -> record the request count and the duration
+  -> route handler
+```
+
+### Route templates
+
+The route label must never contain personal data, so the middleware
+resolves the requested path to its route *template* before recording it.
+The templates are collected from the application's routes at startup and
+matched with the same converters that the router uses, so a request to
+`/attendance/student/STU001` is recorded as
+`/attendance/student/{student_id}`. A path that matches no route is
+labelled `unmatched`.
+
+The middleware resolves the template on every request rather than reading
+`scope["route"]`, because the route is not in the scope before the
+handler runs and is absent entirely when the handler raises.
+
+### What is measured
+
+| Metric | Type |
+| --- | --- |
+| `attendance_up` | gauge |
+| `attendance_uptime_seconds` | gauge |
+| `attendance_http_requests_total` | counter, by route, method, and status |
+| `attendance_http_request_duration_seconds` | histogram, fixed buckets |
+| `attendance_database_reachable` | gauge |
+| `attendance_database_schema_version` | gauge |
+| `attendance_models_loaded` | gauge |
+| `attendance_liveness_sessions_active` | gauge |
+
+The dependency gauges are refreshed when the endpoint is scraped, so a
+scrape always reports the current state rather than a cached one.
+
+### Limits
+
+The metrics live in process memory and are lost on restart. With more
+than one worker each worker keeps its own counters, which is one more
+reason the service is documented to run a single worker.

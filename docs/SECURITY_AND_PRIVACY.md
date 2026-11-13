@@ -246,3 +246,22 @@ They do not expose:
 A test asserts each of these is absent from the responses. The readiness
 endpoint reports the schema version, which is a number the application
 publishes anyway, and whether the models are loaded, which is a boolean.
+
+## Metrics
+
+The metrics endpoint is unauthenticated so that a scraper can reach it. It
+exposes counters, gauges, and histograms only.
+
+A metric label must never contain personal data. The route label is
+always the route template, for example `/attendance/student/{student_id}`,
+never the requested path. A request to `/attendance/student/STU001` is
+recorded as `/attendance/student/{student_id}`. A path that matches no
+route is labelled `unmatched` rather than being recorded verbatim.
+
+The only labels are the route, the HTTP method, and the status code.
+
+A test asserts that a student identifier does not appear in the metrics
+after a request that contains one in its path.
+
+The metrics are operational counters. They are not an audit trail and they
+are not a record of who did what.
