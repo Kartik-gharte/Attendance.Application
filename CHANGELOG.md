@@ -160,3 +160,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 - The runtime test suite no longer writes to the developer's real data directory. A shared fixture points the configured embedding directory and database path at a temporary directory, and the module-level path constants are corrected for modules that were already imported.
+
+### Added
+- An admin enrollment API. `POST /admin/enrollments` enrolls a face embedding and requires an administrator account; a student account receives `403`. The source image is written to a temporary file and removed afterwards, so it is never stored. Every enrollment, including a refused one, is recorded in the audit trail with the operator and the consent reference.
+- `GET /admin/enrollments` returns the enrollment audit entries for an administrator. The entries hold no biometric material.
+- `tests/runtime/test_admin_enrollment.py` covering the authorization boundary, the validation, the audit trail, and the guarantee that the source image is not stored.
+
+### Changed
+- `register_face()` accepts the embedding directory explicitly, so the application configuration decides where a template is written rather than an import-time constant.

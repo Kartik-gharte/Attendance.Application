@@ -620,3 +620,94 @@ of them carry personal data.
   worker.
 - There is no tracing and no alerting. The metrics are meant to be
   scraped by something that provides those.
+
+## Admin enrollment
+
+Enrollment writes a biometric template. It is not reachable by a student
+account. Only an administrator may enroll, and every enrollment is
+recorded in the audit trail.
+
+### `POST /admin/enrollments`
+
+Enroll a face embedding for a student.
+
+**Auth:** Bearer, admin.
+
+Multipart form fields:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `student_id` | Yes | The student the template belongs to. Validated against the identifier pattern. |
+| `consent_reference` | Yes | The record that the person's consent was obtained. A blank value is refused. |
+| `image` | Yes | The source image. It must contain exactly one face. |
+| `overwrite` | No | Replace an existing embedding. Without it, an existing embedding is never replaced. |
+
+```bash
+curl -X POST http://127.0.0.1:8000/admin/enrollments \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -F "student_id=STU001" \
+  -F "consent_reference=consent-2026-001" \
+  -F "image=@/path/to/consented-image.jpg"
+```
+
+Success:
+
+```json
+{
+  "status": "success",
+  "message": "Face enrollment completed",
+  "student_id": "STU001",
+  "operator": "admin-user",
+  "consent_reference": "consent-2026-001"
+}
+```
+
+The source image is written to a temporary file, passed to the enrollment
+service, and removed afterwards. The image itself is never stored.
+
+| Condition | Status |
+| --- | --- |
+| Not authenticated | `401` |
+| The caller is not an administrator | `403` |
+| The student identifier is invalid | `400` |
+| The consent reference is blank | `400` |
+| A required form field is missing | `422` |
+| The image is larger than the upload limit | `413` |
+| The enrollment was refused, for example because an embedding already exists | `409` |
+
+A refused enrollment is still recorded in the audit trail, with the
+outcome `rejected`.
+
+### `GET /admin/enrollments`
+
+Return the enrollment audit entries, most recent first.
+
+**Auth:** Bearer, admin.
+
+| Query parameter | Default | Meaning |
+| --- | --- | --- |
+| `student_id` | — | Return only the entries for this student. |
+| `limit` | `50` | The maximum number of entries. Bounded to 500. |
+
+```json
+{
+  "status": "success",
+  "count": 1,
+  "enrollments": [
+    {
+      "id": 1,
+      "student_id": "STU001",
+      "enrolled_at": "2026-11-13T17:27:00+00:00",
+      "operator": "admin-user",
+      "consent_reference": "consent-2026-001",
+      "source_name": "consented-image.jpg",
+      "embedding_digest": "9f2c...",
+      "outcome": "enrolled",
+      "detail": "The embedding was written"
+    }
+  ]
+}
+```
+
+The entries hold no biometric material: no image, no embedding, and no
+face crop. The embedding is identified by a digest.

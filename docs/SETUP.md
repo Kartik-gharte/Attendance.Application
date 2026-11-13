@@ -291,6 +291,24 @@ The embedding is written to a temporary file in the destination directory
 and moved into place only after it is complete, so a failed enrollment never
 leaves a partial `.npy` file.
 
+### Enrolling through the API
+
+An administrator can enroll through the API instead of the command line.
+The two write the same audit entries.
+
+```bash
+export ADMIN_TOKEN="..."
+
+curl -X POST http://127.0.0.1:8000/admin/enrollments \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -F "student_id=STU001" \
+  -F "consent_reference=consent-2026-001" \
+  -F "image=@/path/to/consented-image.jpg"
+```
+
+The source image is not stored. The enrollment is recorded with the
+administrator as the operator.
+
 ### Verifying a registration
 
 ```bash

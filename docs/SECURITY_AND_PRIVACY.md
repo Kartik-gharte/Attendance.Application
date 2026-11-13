@@ -179,6 +179,11 @@ Controls that protect the enrollment workflow:
   enrollment that is not audited cannot be traced. The audit trail holds
   no biometric material: no image, no embedding, and no face crop. The
   embedding is identified by a digest instead;
+- the enrollment endpoint requires an administrator account. A student
+  account receives `403`. The source image is written to a temporary file
+  and removed after the enrollment, so it is not left on disk;
+- a refused enrollment is recorded too, with the outcome `rejected`, so
+  that an attempt to replace an existing template is visible;
 - the student identifier is validated against a strict pattern before it is
   used to build a path;
 - the destination is always resolved inside the configured embedding
@@ -191,9 +196,12 @@ Controls that protect the enrollment workflow:
 - the workflow logs operational metadata only. Embedding vectors and image
   contents are never written to the log.
 
-There is no self-service enrollment path. Enrollment remains a controlled
-local operation performed by an operator who records the consent
-reference.
+There is no self-service enrollment path. A student cannot enroll
+themselves: the enrollment endpoint requires an administrator account, and
+the enrollment is recorded with that administrator as the operator.
+
+The CLI workflow and the API workflow write the same audit entries, so
+the trail does not depend on how the enrollment was performed.
 
 The consent reference is a pointer to a consent record kept outside the
 application. The application does not store the consent record itself, so
