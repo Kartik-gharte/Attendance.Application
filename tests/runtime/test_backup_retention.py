@@ -368,3 +368,78 @@ def test_cli_create_can_skip_pruning(
 
     assert exit_code == 0
     assert len(list_backups(backup_dir)) == 2
+
+
+
+def test_cli_schedule_prints_cron(tmp_path):
+    from app.database.backup import schedule_backup
+
+    result = schedule_backup(
+        schedule_type="cron",
+        database_path="/var/lib/attendance.db",
+    )
+
+    assert "0 2 * * *" in result
+    assert "python -m app.database.backup create" in result
+    assert "--database-path=/var/lib/attendance.db" in result
+
+
+def test_cli_schedule_prints_systemd(tmp_path):
+    from app.database.backup import schedule_backup
+
+    result = schedule_backup(
+        schedule_type="systemd",
+        database_path="/var/lib/attendance.db",
+        embedding_dir="/var/lib/attendance/embeddings",
+    )
+
+    assert "[Unit]" in result
+    assert "[Service]" in result
+    assert "[Install]" in result
+    assert "ExecStart=" in result
+
+
+def test_cli_prune_creates_new_backup(tmp_path):
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir()
+
+    make_backup(backup_dir, age_days=300)
+    make_backup(backup_dir, age_days=10)
+    make_backup(backup_dir, age_days=1)
+
+    count_before = len(list_backups(backup_dir))
+    assert count_before == 3
+
+    result = backup_module.main(
+        [
+            "prune",
+            "--backup-dir",
+            str(backup_dir),
+            "--retention-days",
+            "30",
+            "--max-count",
+            "2",
+        ]
+    )
+
+    assert result == 0
+    assert len(list_backups(backup_dir)) == 2
+
+
+def test_cli_list_backups(tmp_path):
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir()
+
+    make_backup(backup_dir, age_days=5)
+    make_backup(backup_dir, age_days=1)
+
+    result = backup_module.main(
+        [
+            "list",
+            "--backup-dir",
+            str(backup_dir),
+        ]
+    )
+
+    assert result == 0
+
