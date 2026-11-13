@@ -203,6 +203,12 @@ class Settings(BaseSettings):
         description="Prune expired backups automatically after a backup is created",
     )
 
+    backup_encryption: bool = Field(
+        default=True,
+        validation_alias="BACKUP_ENCRYPTION",
+        description="Encrypt the backup files with a passphrase-derived key",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

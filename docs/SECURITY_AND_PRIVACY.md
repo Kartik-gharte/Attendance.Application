@@ -218,6 +218,18 @@ Controls that apply to a backup:
   first;
 - a restore that fails puts the safety copy back.
 
+The backup files are encrypted by default. The key is derived from a
+passphrase with scrypt. Every file gets a fresh random nonce, the file
+name is bound to the ciphertext so an encrypted file cannot be swapped for
+another one, and the encryption is authenticated so a modified file fails
+to decrypt rather than producing garbage.
+
+The passphrase is never accepted as a command line argument, because
+process arguments are visible to other users on the machine. It comes from
+`BACKUP_PASSPHRASE` or from an interactive prompt. With encryption
+enabled and no passphrase available, the backup fails loudly rather than
+writing a plaintext copy of biometric data.
+
 A backup is still sensitive. It must be stored with the same access
 controls as the live data, kept only as long as the operational need
 requires, and deleted when it is no longer needed. Backups must not be

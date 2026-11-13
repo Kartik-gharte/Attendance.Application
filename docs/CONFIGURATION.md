@@ -222,3 +222,30 @@ Pruning can also be run on its own:
 python -m app.database.backup prune --dry-run
 python -m app.database.backup prune
 ```
+## Backup encryption
+
+The backup files hold the face embeddings and the attendance records. They
+are encrypted by default.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `BACKUP_ENCRYPTION` | `true` | Encrypt the backup files with a passphrase-derived key. |
+| `BACKUP_PASSPHRASE` | — | The passphrase. When it is not set, the client prompts for it. |
+
+The key is derived from the passphrase with scrypt. Every file gets a
+fresh random nonce, and the file name is bound to the ciphertext, so an
+encrypted file cannot be swapped for another one. The encryption is
+authenticated, so a modified file fails to decrypt rather than producing
+garbage.
+
+The passphrase is **never** accepted as a command line argument, because
+process arguments are visible to other users on the machine. It comes
+from `BACKUP_PASSPHRASE` or from an interactive prompt.
+
+With encryption enabled and no passphrase available, the backup fails
+loudly rather than writing a plaintext copy of biometric data. Set
+`BACKUP_ENCRYPTION=false` to store a backup without encryption.
+
+When a backup is encrypted, the stored files end in `.enc` and the
+manifest records the key derivation parameters and the salt. The salt is
+not secret.

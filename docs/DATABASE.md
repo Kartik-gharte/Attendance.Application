@@ -261,20 +261,50 @@ safe place and puts them back.
 
 | Item | Description |
 | --- | --- |
-| `attendance.db` | The SQLite database, copied with the SQLite online backup API so the copy is consistent even while the service is running. |
-| `embeddings/` | The `.npy` face embedding files. |
-| `manifest.json` | The backup version, creation time, schema version, the SHA-256 checksum of the database, and the list of embedding files. |
+| `attendance.db` | The SQLite database, copied with the SQLite online backup API so the copy is consistent even while the service is running. Stored as `attendance.db.enc` when the backup is encrypted. |
+| `embeddings/` | The `.npy` face embedding files. Stored as `<name>.npy.enc` when the backup is encrypted. |
+| `manifest.json` | The backup version, creation time, schema version, the SHA-256 checksum of the database, the list of embedding files, and the key derivation parameters when the backup is encrypted. |
 
 A backup does not contain plaintext credentials. Passwords are stored as
 Argon2id hashes and bearer tokens as SHA-256 hashes, so a backup does not
 reveal either. It does contain biometric templates and personal data, so it
 must be stored with the same care as the live data.
 
+### Encryption
+
+The backup files are encrypted by default. The key is derived from a
+passphrase with scrypt, which is memory hard and therefore expensive to
+attack against a weak passphrase.
+
+- Every file gets a fresh random nonce.
+- The stored file name is bound to the ciphertext as associated data, so an
+  encrypted file cannot be swapped for another one.
+- The encryption is authenticated, so a modified file fails to decrypt
+  rather than producing garbage.
+- The checksum in the manifest is of the **plaintext**, so a swapped or
+  corrupted file is detected after decryption.
+
+The passphrase is never accepted as a command line argument, because
+process arguments are visible to other users on the machine. It comes
+from `BACKUP_PASSPHRASE` or from an interactive prompt.
+
+With encryption enabled and no passphrase available, the backup fails
+loudly rather than writing a plaintext copy of biometric data. Set
+`BACKUP_ENCRYPTION=false` to store a backup without encryption.
+
+Verifying an encrypted backup without the passphrase checks that the files
+are present but cannot check the contents. Restoring one always requires
+the passphrase.
+
 ### Creating a backup
 
 ```bash
+export BACKUP_PASSPHRASE="..."
 python -m app.database.backup create
 ```
+
+Without `BACKUP_PASSPHRASE`, the command prompts for the passphrase when
+it is run from a terminal.
 
 The backup is written to a `backups` directory next to the database, in a
 timestamped subdirectory. A backup is never overwritten.
@@ -295,6 +325,9 @@ python -m app.database.backup list
 python -m app.database.backup verify --backup-path backups/backup_20260101T120000Z
 ```
 
+An encrypted backup is fully verified only when the passphrase is
+available.
+
 Verification checks that the manifest is readable, that the database file
 is present, that its SHA-256 checksum matches the manifest, that the
 database passes the SQLite integrity check, that it contains the
@@ -308,6 +341,10 @@ python -m app.database.backup restore \
   --backup-path backups/backup_20260101T120000Z \
   --overwrite
 ```
+
+The restored database and the restored embeddings are the plaintext
+templates, so the destination directory holds usable embeddings rather
+than encrypted ones.
 
 The restore:
 

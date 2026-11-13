@@ -6,10 +6,13 @@ from app.core.config import PROJECT_ROOT, Settings
 
 def test_defaults_use_project_root_paths():
 
-    settings = Settings(_env_file=None)
+    # The declared defaults are checked rather than a constructed
+    # instance, because the test suite points the configured paths at a
+    # temporary directory.
+    defaults = Settings.model_fields
 
     assert (
-        settings.mediapipe_face_landmarker_model
+        defaults["mediapipe_face_landmarker_model"].default
         == PROJECT_ROOT
         / "models"
         / "mediapipe"
@@ -17,15 +20,15 @@ def test_defaults_use_project_root_paths():
     )
 
     assert (
-        settings.embedding_dir
+        defaults["embedding_dir"].default
         == PROJECT_ROOT / "data" / "face_embeddings"
     )
 
     assert (
-        settings.database_path
+        defaults["database_path"].default
         == PROJECT_ROOT / "data" / "attendance.db"
     )
-    assert settings.auth_token_ttl_seconds == 3600
+    assert defaults["auth_token_ttl_seconds"].default == 3600
 
 
 def test_environment_overrides_relative_paths(monkeypatch, tmp_path):

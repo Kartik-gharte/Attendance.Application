@@ -21,6 +21,16 @@ from app.database.backup import (
 )
 
 
+def create_plain_backup(**kwargs):
+    """Create a backup without encryption.
+
+    The encrypted path is covered in test_encrypted_backup.py. These tests
+    exercise the plaintext path.
+    """
+
+    return create_backup(encrypt=False, **kwargs)
+
+
 @pytest.fixture
 def seeded_database(tmp_path):
     """Create a database with accounts and attendance records."""
@@ -105,7 +115,7 @@ def read_user_count(database_path):
 def test_backup_creates_database_and_manifest(tmp_path, seeded_database):
     backup_dir = tmp_path / "backups"
 
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=backup_dir,
         database_path=seeded_database,
     )
@@ -121,7 +131,7 @@ def test_backup_manifest_records_the_schema_version(
 ):
     from app.database.migrations import get_current_schema_version
 
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -138,7 +148,7 @@ def test_backup_manifest_records_the_database_checksum(
     tmp_path,
     seeded_database,
 ):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -149,7 +159,7 @@ def test_backup_manifest_records_the_database_checksum(
 
 
 def test_backup_includes_the_embeddings(tmp_path, seeded_database, seeded_embeddings):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
         embedding_dir=seeded_embeddings,
@@ -170,7 +180,7 @@ def test_backup_can_exclude_the_embeddings(
     seeded_database,
     seeded_embeddings,
 ):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
         embedding_dir=seeded_embeddings,
@@ -184,7 +194,7 @@ def test_backup_can_exclude_the_embeddings(
 
 def test_backup_of_a_missing_database_fails(tmp_path):
     with pytest.raises(BackupError):
-        create_backup(
+        create_plain_backup(
             backup_dir=tmp_path / "backups",
             database_path=tmp_path / "does-not-exist.db",
         )
@@ -194,7 +204,7 @@ def test_backup_does_not_store_plaintext_credentials(
     tmp_path,
     seeded_database,
 ):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -218,7 +228,7 @@ def test_backup_does_not_store_plaintext_credentials(
 
 
 def test_verify_accepts_a_valid_backup(tmp_path, seeded_database):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -234,7 +244,7 @@ def test_verify_rejects_a_missing_backup(tmp_path):
 
 
 def test_verify_rejects_a_backup_without_a_manifest(tmp_path, seeded_database):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -246,7 +256,7 @@ def test_verify_rejects_a_backup_without_a_manifest(tmp_path, seeded_database):
 
 
 def test_verify_rejects_a_corrupt_database(tmp_path, seeded_database):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -258,7 +268,7 @@ def test_verify_rejects_a_corrupt_database(tmp_path, seeded_database):
 
 
 def test_verify_rejects_a_backup_missing_the_database(tmp_path, seeded_database):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -274,7 +284,7 @@ def test_verify_rejects_a_backup_missing_an_embedding(
     seeded_database,
     seeded_embeddings,
 ):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
         embedding_dir=seeded_embeddings,
@@ -287,7 +297,7 @@ def test_verify_rejects_a_backup_missing_an_embedding(
 
 
 def test_verify_rejects_an_unreadable_manifest(tmp_path, seeded_database):
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -304,7 +314,7 @@ def test_verify_rejects_an_unreadable_manifest(tmp_path, seeded_database):
 
 
 def test_restore_replaces_the_database(tmp_path, seeded_database):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -328,7 +338,7 @@ def test_restore_replaces_the_database(tmp_path, seeded_database):
 
 
 def test_restore_preserves_the_attendance_records(tmp_path, seeded_database):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -347,7 +357,7 @@ def test_restore_preserves_the_attendance_records(tmp_path, seeded_database):
 
 
 def test_restore_preserves_the_accounts(tmp_path, seeded_database):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -365,7 +375,7 @@ def test_restore_refuses_to_overwrite_without_the_flag(
     tmp_path,
     seeded_database,
 ):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -379,7 +389,7 @@ def test_restore_refuses_to_overwrite_without_the_flag(
 
 
 def test_restore_writes_a_safety_copy(tmp_path, seeded_database):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -398,7 +408,7 @@ def test_restore_into_an_empty_location_creates_the_database(
     tmp_path,
     seeded_database,
 ):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -417,7 +427,7 @@ def test_restore_into_an_empty_location_creates_the_database(
 
 
 def test_restore_rejects_an_invalid_backup(tmp_path, seeded_database):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -432,7 +442,7 @@ def test_restore_rejects_an_invalid_backup(tmp_path, seeded_database):
 
 
 def test_restore_rejects_a_backup_without_a_manifest(tmp_path, seeded_database):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -452,7 +462,7 @@ def test_restore_rejects_a_corrupt_backup_before_touching_the_database(
 ):
     """A backup that fails verification must not modify the live database."""
 
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
     )
@@ -481,7 +491,7 @@ def test_restore_reinstates_the_embeddings(
     seeded_database,
     seeded_embeddings,
 ):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
         embedding_dir=seeded_embeddings,
@@ -504,7 +514,7 @@ def test_restore_reinstates_the_embeddings(
 
 
 def test_restored_embedding_content_matches(tmp_path, seeded_database, seeded_embeddings):
-    backup = create_backup(
+    backup = create_plain_backup(
         backup_dir=tmp_path / "backups",
         database_path=seeded_database,
         embedding_dir=seeded_embeddings,
@@ -528,7 +538,13 @@ def test_restored_embedding_content_matches(tmp_path, seeded_database, seeded_em
 # =========================================================
 
 
-def test_cli_create_list_verify_and_restore(tmp_path, seeded_database):
+def test_cli_create_list_verify_and_restore(
+    tmp_path,
+    seeded_database,
+    monkeypatch,
+):
+    monkeypatch.setenv("BACKUP_PASSPHRASE", "test-passphrase")
+
     backup_root = tmp_path / "backups"
 
     assert (

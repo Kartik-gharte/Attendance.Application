@@ -34,6 +34,19 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.core.config import get_settings
+from app.core.crypto import (
+    SCRYPT_N,
+    SCRYPT_P,
+    SCRYPT_R,
+    EncryptionError,
+    decrypt_bytes,
+    derive_key,
+    encrypt_bytes,
+    encrypted_name,
+    generate_salt,
+    is_encrypted_name,
+    resolve_passphrase,
+)
 from app.core.logging_config import get_logger
 
 
@@ -49,7 +62,13 @@ class BackupError(RuntimeError):
 
 @dataclass
 class BackupManifest:
-    """Describes the contents of a backup."""
+    """Describes the contents of a backup.
+
+    The file names are the stored names. When the backup is encrypted, the
+    stored name of a file ends with the encryption suffix and the manifest
+    records the encryption parameters so that the key can be derived
+    again. The salt is not secret.
+    """
 
     version: int
     created_at: str
@@ -58,6 +77,30 @@ class BackupManifest:
     schema_version: int
     embedding_files: list[str] = field(default_factory=list)
     embedding_count: int = 0
+    encrypted: bool = False
+    encryption: dict | None = None
+
+    @property
+    def encryption_salt(self) -> bytes | None:
+        """Return the salt used to derive the key, when encrypted."""
+
+        if not self.encrypted or not self.encryption:
+            return None
+
+        salt = self.encryption.get("salt")
+
+        if not salt:
+            return None
+
+        return bytes.fromhex(salt)
+
+    def stored_name(self, name: str) -> str:
+        """Return the stored name of a logical file."""
+
+        if self.encrypted:
+            return encrypted_name(name)
+
+        return name
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2, sort_keys=True)
@@ -74,6 +117,8 @@ class BackupManifest:
             schema_version=data["schema_version"],
             embedding_files=data.get("embedding_files", []),
             embedding_count=data.get("embedding_count", 0),
+            encrypted=bool(data.get("encrypted", False)),
+            encryption=data.get("encryption"),
         )
 
 
@@ -280,6 +325,8 @@ def create_backup(
     embedding_dir=None,
     include_embeddings: bool = True,
     prune: bool | None = None,
+    encrypt: bool | None = None,
+    passphrase: str | None = None,
 ) -> Path:
     """Create a backup and return the path of the backup directory.
 
@@ -293,6 +340,11 @@ def create_backup(
         include_embeddings: Whether to include the face embeddings.
         prune: Whether to prune expired backups afterwards. Defaults to
             the configured value.
+        encrypt: Whether to encrypt the backup files. Defaults to the
+            configured value.
+        passphrase: The passphrase to derive the key from. When it is not
+            given, it is read from the environment or prompted for. It is
+            never accepted as a command line argument.
 
     Returns:
         The path of the created backup directory.
@@ -308,6 +360,38 @@ def create_backup(
 
     else:
         target_root = Path(backup_dir)
+
+    settings = get_settings()
+
+    if encrypt is None:
+        encrypt = settings.backup_encryption
+
+    key = None
+    salt = None
+    encryption_parameters = None
+
+    if encrypt:
+
+        resolved = resolve_passphrase(passphrase)
+
+        if not resolved:
+            raise BackupError(
+                "Encryption is enabled but no passphrase is available. Set "
+                "BACKUP_PASSPHRASE, or run from a terminal to be prompted, "
+                "or set BACKUP_ENCRYPTION=false to store the backup "
+                "without encryption."
+            )
+
+        salt = generate_salt()
+        key = derive_key(resolved, salt)
+
+        encryption_parameters = {
+            "kdf": "scrypt",
+            "n": SCRYPT_N,
+            "r": SCRYPT_R,
+            "p": SCRYPT_P,
+            "salt": salt.hex(),
+        }
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
@@ -338,16 +422,36 @@ def create_backup(
                 backup_path / "embeddings",
             )
 
+        # The checksum is of the plaintext, so that a swapped or
+        # corrupted file is detected after decryption.
+        database_digest = _sha256(database_copy)
+
+        stored_database_name = database_copy.name
+
+        if key is not None:
+
+            stored_database_name = encrypted_name(database_copy.name)
+
+            _encrypt_in_place(key, database_copy, stored_database_name)
+
+            embedding_files = _encrypt_embeddings(
+                key,
+                backup_path / "embeddings",
+                embedding_files,
+            )
+
         manifest = BackupManifest(
             version=MANIFEST_VERSION,
             created_at=datetime.now(timezone.utc).isoformat(
                 timespec="seconds"
             ),
-            database_file=database_copy.name,
-            database_sha256=_sha256(database_copy),
+            database_file=stored_database_name,
+            database_sha256=database_digest,
             schema_version=_current_schema_version(source_database),
             embedding_files=embedding_files,
             embedding_count=len(embedding_files),
+            encrypted=key is not None,
+            encryption=encryption_parameters,
         )
 
         (backup_path / MANIFEST_NAME).write_text(
@@ -400,6 +504,55 @@ def _backup_database(source: Path, destination: Path) -> None:
         source_connection.close()
 
 
+def _encrypt_in_place(key: bytes, path: Path, stored_name: str) -> None:
+    """Encrypt a file and rename it to its stored name.
+
+    The plaintext is overwritten with the ciphertext before the file is
+    renamed, so the plaintext is not left on disk under its original
+    name.
+    """
+
+    plaintext = path.read_bytes()
+
+    encrypted = encrypt_bytes(
+        key,
+        plaintext,
+        stored_name.encode("utf-8"),
+    )
+
+    path.write_bytes(encrypted)
+
+    target = path.parent / stored_name
+
+    if target != path:
+        path.rename(target)
+
+
+def _encrypt_embeddings(
+    key: bytes,
+    directory: Path,
+    names: list[str],
+) -> list[str]:
+    """Encrypt the listed embedding files and return their stored names."""
+
+    stored = []
+
+    for name in names:
+
+        path = directory / name
+
+        if not path.is_file():
+            continue
+
+        stored_name = encrypted_name(name)
+
+        _encrypt_in_place(key, path, stored_name)
+
+        stored.append(stored_name)
+
+    return stored
+
+
 def _backup_embeddings(source: Path, destination: Path) -> list[str]:
     """Copy the embedding files and return their relative names."""
 
@@ -426,8 +579,53 @@ def _backup_embeddings(source: Path, destination: Path) -> list[str]:
 # VERIFICATION
 # =========================================================
 
-def verify_backup(backup_path) -> BackupManifest:
+def _manifest_key(manifest: BackupManifest, passphrase: str | None) -> bytes | None:
+    """Return the encryption key for a backup, when one is available."""
+
+    if not manifest.encrypted:
+        return None
+
+    salt = manifest.encryption_salt
+
+    if salt is None:
+        raise BackupError(
+            "The backup is marked as encrypted but the manifest has no salt"
+        )
+
+    resolved = resolve_passphrase(passphrase)
+
+    if not resolved:
+        return None
+
+    return derive_key(resolved, salt)
+
+
+def _read_plaintext(
+    path: Path,
+    stored_name: str,
+    key: bytes | None,
+) -> bytes:
+    """Return the plaintext content of a stored file."""
+
+    if key is None:
+        return path.read_bytes()
+
+    return decrypt_bytes(
+        key,
+        path.read_bytes(),
+        stored_name.encode("utf-8"),
+    )
+
+
+def verify_backup(
+    backup_path,
+    passphrase: str | None = None,
+) -> BackupManifest:
     """Verify a backup and return its manifest.
+
+    An encrypted backup is only fully verified when the passphrase is
+    available. Without it, the presence of the stored files is checked
+    but the contents cannot be verified.
 
     Raises:
         BackupError: When the backup is missing, incomplete, or corrupt.
@@ -462,15 +660,34 @@ def verify_backup(backup_path) -> BackupManifest:
             f"The backup at {path} does not contain {manifest.database_file}"
         )
 
-    actual_digest = _sha256(database_file)
+    key = _manifest_key(manifest, passphrase)
 
-    if actual_digest != manifest.database_sha256:
-        raise BackupError(
-            "The backup database does not match its manifest checksum. "
-            "The backup is incomplete or corrupt."
+    if manifest.encrypted and key is None:
+        # The contents cannot be verified without the passphrase.
+        logger.warning(
+            "The backup is encrypted and no passphrase was supplied, so its "
+            "contents were not verified."
         )
 
-    _verify_backup_database(database_file, manifest)
+    else:
+
+        try:
+            plaintext = _read_plaintext(
+                database_file,
+                manifest.database_file,
+                key,
+            )
+
+        except EncryptionError as error:
+            raise BackupError(str(error)) from error
+
+        if hashlib.sha256(plaintext).hexdigest() != manifest.database_sha256:
+            raise BackupError(
+                "The backup database does not match its manifest checksum. "
+                "The backup is incomplete or corrupt."
+            )
+
+        _verify_backup_database(plaintext, manifest)
 
     for name in manifest.embedding_files:
         if not (path / "embeddings" / name).is_file():
@@ -482,14 +699,21 @@ def verify_backup(backup_path) -> BackupManifest:
 
 
 def _verify_backup_database(
-    database_file: Path,
+    plaintext: bytes,
     manifest: BackupManifest,
 ) -> None:
     """Check that the backed up database is readable and has the schema."""
 
-    connection = sqlite3.connect(str(database_file))
+    connection = sqlite3.connect(":memory:")
 
     try:
+
+        connection.execute(
+            "PRAGMA database_list"
+        ).fetchall()
+
+        # Load the decrypted database into the in-memory connection.
+        connection.deserialize(plaintext)
 
         integrity = connection.execute(
             "PRAGMA integrity_check"
@@ -542,6 +766,7 @@ def restore_backup(
     embedding_dir=None,
     overwrite: bool = False,
     restore_embeddings: bool = True,
+    passphrase: str | None = None,
 ) -> dict:
     """Restore the database and the embeddings from a backup.
 
@@ -556,6 +781,8 @@ def restore_backup(
             the configured embedding directory.
         overwrite: Whether an existing database may be replaced.
         restore_embeddings: Whether the embeddings are restored.
+        passphrase: The passphrase for an encrypted backup. When it is not
+            given, it is read from the environment or prompted for.
 
     Returns:
         A dict describing what was restored.
@@ -565,9 +792,17 @@ def restore_backup(
             ``overwrite`` is not set, or the restore fails.
     """
 
-    manifest = verify_backup(backup_path)
+    manifest = verify_backup(backup_path, passphrase=passphrase)
 
     source = Path(backup_path)
+
+    key = _manifest_key(manifest, passphrase)
+
+    if manifest.encrypted and key is None:
+        raise BackupError(
+            "The backup is encrypted and no passphrase is available. Set "
+            "BACKUP_PASSPHRASE, or run from a terminal to be prompted."
+        )
 
     target_database = _resolve_database_path(database_path)
 
@@ -593,9 +828,21 @@ def restore_backup(
 
         target_database.parent.mkdir(parents=True, exist_ok=True)
 
-        shutil.copy2(source / manifest.database_file, target_database)
+        if key is None:
 
-    except OSError as error:
+            shutil.copy2(source / manifest.database_file, target_database)
+
+        else:
+
+            plaintext = _read_plaintext(
+                source / manifest.database_file,
+                manifest.database_file,
+                key,
+            )
+
+            target_database.write_bytes(plaintext)
+
+    except (OSError, EncryptionError) as error:
 
         if safety_copy is not None:
             shutil.copy2(safety_copy, target_database)
@@ -614,6 +861,7 @@ def restore_backup(
             source / "embeddings",
             target_embedding_dir,
             manifest.embedding_files,
+            key,
         )
 
     _verify_restored_database(target_database, manifest)
@@ -637,21 +885,44 @@ def _restore_embeddings(
     source: Path,
     destination: Path,
     names: list[str],
+    key: bytes | None = None,
 ) -> int:
-    """Copy the listed embedding files into the destination directory."""
+    """Copy the listed embedding files into the destination directory.
+
+    An encrypted backup is decrypted on the way out, so the restored
+    embedding is the plaintext template.
+    """
 
     destination.mkdir(parents=True, exist_ok=True)
 
     restored = 0
 
-    for name in names:
+    for stored_name in names:
 
-        source_file = source / name
+        source_file = source / stored_name
 
         if not source_file.is_file():
             continue
 
-        shutil.copy2(source_file, destination / name)
+        # The restored name is the logical name, without the suffix.
+        logical_name = stored_name
+
+        if is_encrypted_name(stored_name):
+            logical_name = stored_name[: -len(".enc")]
+
+        if key is None:
+
+            shutil.copy2(source_file, destination / logical_name)
+
+        else:
+
+            plaintext = decrypt_bytes(
+                key,
+                source_file.read_bytes(),
+                stored_name.encode("utf-8"),
+            )
+
+            (destination / logical_name).write_bytes(plaintext)
 
         restored += 1
 
@@ -769,6 +1040,13 @@ def build_parser():
         action="store_true",
         help="Do not prune expired backups after creating the backup",
     )
+    parser.add_argument(
+        "--no-encryption",
+        action="store_true",
+        help="Store the backup without encryption. The passphrase is never "
+        "accepted as a command line argument; set BACKUP_PASSPHRASE or run "
+        "from a terminal to be prompted.",
+    )
 
     return parser
 
@@ -795,6 +1073,7 @@ def main(argv=None) -> int:
                 embedding_dir=args.embedding_dir,
                 include_embeddings=not args.no_embeddings,
                 prune=not args.no_prune,
+                encrypt=not args.no_encryption,
             )
 
             logger.info("Backup created at %s", path)
