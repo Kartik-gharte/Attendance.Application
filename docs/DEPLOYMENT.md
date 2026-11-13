@@ -99,6 +99,26 @@ Point the liveness probe at `/health/live` and the readiness probe at
 database outage would then cause a restart loop instead of draining the
 instance.
 
+## Metrics
+
+The service exposes metrics in the Prometheus text exposition format at
+`GET /metrics`. The endpoint is unauthenticated so a scraper can reach it.
+
+```
+# HELP attendance_http_requests_total HTTP requests served.
+# TYPE attendance_http_requests_total counter
+attendance_http_requests_total{method="GET",route="/attendance/student/{student_id}",status="200"} 12.0
+```
+
+Point a Prometheus scraper at `/metrics`. The route label is always the
+route template, so a student identifier never reaches the metrics.
+
+The metrics are held in process memory and are lost on restart. With more
+than one worker each worker keeps its own counters, which is one more
+reason to run a single worker.
+
+The metrics do not replace an audit log. They are operational counters.
+
 ## Measured baseline
 
 Reproduce them with:
@@ -234,6 +254,6 @@ The startup logs are on stderr. See
 - No audit log. The application log is diagnostic output, not a tamper
   evident record.
 - No automatic backup schedule.
-- No metrics, tracing, or alerting.
+- No tracing and no alerting. Metrics are exposed for a scraper to collect.
 - No measured accuracy for face recognition or presentation attack
   detection. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).

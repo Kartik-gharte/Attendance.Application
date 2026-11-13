@@ -542,3 +542,81 @@ SQLite integrity check, that it contains the `attendance` table, and that
 its schema version matches the version the application expects. A database
 that is behind the expected version is reported as not ready, because
 pending migrations must be applied.
+
+## Metrics
+
+### `GET /metrics`
+
+Returns the service metrics in the Prometheus text exposition format. The
+endpoint is unauthenticated so that a scraper can reach it.
+
+```
+Content-Type: text/plain; version=0.0.4; charset=utf-8
+```
+
+Example:
+
+```
+# HELP attendance_up Whether the service is running.
+# TYPE attendance_up gauge
+attendance_up 1
+# HELP attendance_uptime_seconds Seconds since start.
+# TYPE attendance_uptime_seconds gauge
+attendance_uptime_seconds 3612.442
+# HELP attendance_http_requests_total HTTP requests served.
+# TYPE attendance_http_requests_total counter
+attendance_http_requests_total{method="GET",route="/attendance/student/{student_id}",status="200"} 12.0
+# HELP attendance_http_request_duration_seconds HTTP request duration.
+# TYPE attendance_http_request_duration_seconds histogram
+attendance_http_request_duration_seconds_bucket{le="0.05",method="GET",route="/attendance/student/{student_id}"} 12.0
+attendance_http_request_duration_seconds_bucket{le="+Inf",method="GET",route="/attendance/student/{student_id}"} 12.0
+attendance_http_request_duration_seconds_sum{method="GET",route="/attendance/student/{student_id}"} 0.284
+attendance_http_request_duration_seconds_count{method="GET",route="/attendance/student/{student_id}"} 12.0
+# HELP attendance_database_reachable Whether the database is reachable.
+# TYPE attendance_database_reachable gauge
+attendance_database_reachable 1
+# HELP attendance_models_loaded Whether the biometric models are loaded.
+# TYPE attendance_models_loaded gauge
+attendance_models_loaded 1
+# HELP attendance_liveness_sessions_active Live liveness sessions.
+# TYPE attendance_liveness_sessions_active gauge
+attendance_liveness_sessions_active 2
+```
+
+### Metric labels
+
+The route label is always the **route template**, for example
+`/attendance/student/{student_id}`, never the requested path. A request to
+`/attendance/student/STU001` is recorded as
+`/attendance/student/{student_id}`, so a student identifier never reaches
+the metrics.
+
+A path that matches no route is labelled `unmatched`, rather than being
+recorded verbatim.
+
+The only labels are the route, the HTTP method, and the status code. None
+of them carry personal data.
+
+### What is measured
+
+| Metric | Type | Meaning |
+| --- | --- | --- |
+| `attendance_up` | gauge | The process is running. |
+| `attendance_uptime_seconds` | gauge | Seconds since the process started. |
+| `attendance_http_requests_total` | counter | Requests served, by route, method, and status. |
+| `attendance_http_request_duration_seconds` | histogram | Request duration, with fixed buckets. |
+| `attendance_database_reachable` | gauge | Whether the database is reachable. |
+| `attendance_database_schema_version` | gauge | The applied schema version. |
+| `attendance_models_loaded` | gauge | Whether the biometric models are loaded. |
+| `attendance_liveness_sessions_active` | gauge | The number of live liveness sessions. |
+
+### Limitations
+
+- The metrics are held in process memory and are lost on restart. They are
+  not a durable record.
+- With more than one worker, each worker keeps its own counters. Scraping
+  each worker separately gives the true totals; scraping a load balancer
+  gives one worker's view. The service is documented to run a single
+  worker.
+- There is no tracing and no alerting. The metrics are meant to be
+  scraped by something that provides those.

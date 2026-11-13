@@ -127,3 +127,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 - `tests/runtime/test_auth_cli.py` covering the cleanup command: it deletes the old attendance records, it deletes the old enrollment audit entries, it keeps the recent records, it succeeds on an empty database, and it actually deletes something.
+
+### Added
+- A metrics endpoint at `GET /metrics` that returns the service metrics in the Prometheus text exposition format. It exposes the request count and duration, whether the database is reachable, the applied schema version, whether the biometric models are loaded, and the number of live liveness sessions. No third-party library is used.
+- `app/core/metrics.py` with a thread-safe registry, a fixed-bucket duration histogram, and the route template resolution.
+- `app/api/metrics_routes.py` with the metrics middleware and the endpoint.
+- `tests/runtime/test_metrics.py` covering the endpoint, the label redaction, the gauges, the registry, and the route template collection.
+
+### Fixed
+- A student identifier can no longer reach the metrics. The route label is the route template, and a path that matches no route is labelled `unmatched` rather than recorded verbatim.
