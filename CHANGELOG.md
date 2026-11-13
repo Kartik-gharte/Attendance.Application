@@ -139,3 +139,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - `docs/ISSUE_AUDIT.md`, `docs/ISSUE_BACKLOG.md`, and `docs/PROJECT_STATUS.md` updated to the verified state after PRs #37, #38, #39, and #40. The test count is now 258, and the follow-up work that was delivered is recorded with its pull request.
+
+### Changed
+- `README.md` updated to the current implementation. It no longer describes the automated test suite, the CI checks, the retention and deletion work, the parameterized client, or the structured logging as missing. It now lists the health and metrics endpoints, the operational tooling, the measured test count, and the enrollment audit trail, and it no longer lists the manual scripts at the repository root.
+- The repository map in `README.md` now matches the actual directory layout.
+
+### Removed
+- `app/utils/`. It was an empty package that nothing imported.
