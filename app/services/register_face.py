@@ -18,6 +18,14 @@ import numpy as np
 
 from app.core.config import get_settings
 from app.core.logging_config import get_logger
+from app.services.enrollment_audit import (
+    AuditError,
+    OUTCOME_ENROLLED,
+    OUTCOME_FAILED,
+    OUTCOME_REJECTED,
+    embedding_digest,
+    record_enrollment,
+)
 from app.services.validation import validate_student_id
 
 
@@ -145,6 +153,10 @@ def register_face(
     overwrite: bool = False,
     dry_run: bool = False,
     analyzer=None,
+    operator: str | None = None,
+    consent_reference: str | None = None,
+    database_path=None,
+    audit: bool = True,
 ) -> str | None:
     """Enroll a face embedding for a student.
 
@@ -158,11 +170,50 @@ def register_face(
         dry_run: Validate everything without writing a file.
         analyzer: Pre-built InsightFace analyzer. When omitted the analyzer
             is created, which loads the model.
+        operator: The person performing the enrollment. Recorded in the
+            audit trail.
+        consent_reference: The record that the person's consent was
+            obtained. Recorded in the audit trail.
+        database_path: Database the audit entry is written to.
+        audit: Whether to record an audit entry. A dry run is never
+            audited, because nothing was enrolled.
 
     Returns:
         The path of the written embedding, or ``None`` when the enrollment
         was refused or failed.
     """
+
+    def record(outcome, detail, digest=None):
+        """Write the audit entry for this attempt."""
+
+        if not audit:
+            return
+
+        if operator is None or consent_reference is None:
+            logger.error(
+                "The enrollment was not audited because the operator or the "
+                "consent reference is missing."
+            )
+            return
+
+        try:
+            record_enrollment(
+                student_id=validated_student_id,
+                operator=operator,
+                consent_reference=consent_reference,
+                outcome=outcome,
+                source_name=image_path,
+                embedding_digest_value=digest,
+                detail=detail,
+                database_path=database_path,
+            )
+
+        except AuditError:
+            logger.error(
+                "The enrollment audit entry could not be written for "
+                "student_id=%s",
+                validated_student_id,
+            )
 
     try:
         validated_student_id = validate_student_id(student_id)
@@ -175,6 +226,7 @@ def register_face(
 
     if image is None:
         logger.error("Source image could not be opened")
+        record(OUTCOME_FAILED, "The source image could not be opened")
         return None
 
     if analyzer is None:
@@ -185,6 +237,7 @@ def register_face(
 
     except EnrollmentError as error:
         logger.error("Enrollment aborted: %s", error)
+        record(OUTCOME_REJECTED, str(error))
         return None
 
     try:
@@ -195,12 +248,17 @@ def register_face(
 
     except EnrollmentError as error:
         logger.error("Enrollment aborted: %s", error)
+        record(OUTCOME_REJECTED, str(error))
         return None
 
     if destination.exists() and not overwrite:
         logger.error(
             "Enrollment refused: an embedding already exists for this "
             "student. Use the overwrite flag to replace it."
+        )
+        record(
+            OUTCOME_REJECTED,
+            "An embedding already exists for this student",
         )
         return None
 
@@ -211,16 +269,25 @@ def register_face(
         )
         return None
 
+    digest = embedding_digest(embedding)
+
     try:
         write_embedding_atomically(embedding, destination)
 
     except OSError as error:
         logger.error("Enrollment failed to write the embedding: %s", error)
+        record(OUTCOME_FAILED, "The embedding could not be written")
         return None
 
     logger.info(
         "Face registration completed: student_id=%s",
         validated_student_id,
+    )
+
+    record(
+        OUTCOME_ENROLLED,
+        "The embedding was written",
+        digest=digest,
     )
 
     return str(destination)
@@ -258,6 +325,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Validate the request without writing a file",
     )
+    parser.add_argument(
+        "--operator",
+        default=None,
+        help="The person performing the enrollment. Recorded in the "
+        "audit trail.",
+    )
+    parser.add_argument(
+        "--consent-reference",
+        default=None,
+        help="The record that the person's consent was obtained. Recorded "
+        "in the audit trail.",
+    )
+    parser.add_argument(
+        "--database-path",
+        default=None,
+        help="Database the audit entry is written to "
+        "(defaults to the configured database path)",
+    )
+    parser.add_argument(
+        "--no-audit",
+        action="store_true",
+        help="Do not record an audit entry. An enrollment without an audit "
+        "entry cannot be traced.",
+    )
 
     return parser
 
@@ -271,6 +362,10 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir,
         overwrite=args.overwrite,
         dry_run=args.dry_run,
+        operator=args.operator,
+        consent_reference=args.consent_reference,
+        database_path=args.database_path,
+        audit=not args.no_audit,
     )
 
     if result is None:

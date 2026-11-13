@@ -174,6 +174,11 @@ Before an enrollment is performed:
 
 Controls that protect the enrollment workflow:
 
+- every enrollment is recorded in the `enrollment_audit` table, with the
+  operator, the time, and the consent reference that authorizes it. An
+  enrollment that is not audited cannot be traced. The audit trail holds
+  no biometric material: no image, no embedding, and no face crop. The
+  embedding is identified by a digest instead;
 - the student identifier is validated against a strict pattern before it is
   used to build a path;
 - the destination is always resolved inside the configured embedding
@@ -186,8 +191,13 @@ Controls that protect the enrollment workflow:
 - the workflow logs operational metadata only. Embedding vectors and image
   contents are never written to the log.
 
-There is no self-service enrollment path and no enrollment audit trail.
-Both remain future work.
+There is no self-service enrollment path. Enrollment remains a controlled
+local operation performed by an operator who records the consent
+reference.
+
+The consent reference is a pointer to a consent record kept outside the
+application. The application does not store the consent record itself, so
+the reference must name something an auditor can actually retrieve.
 
 ## Backups
 

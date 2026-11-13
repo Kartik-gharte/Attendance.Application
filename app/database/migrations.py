@@ -52,7 +52,7 @@ logger = get_logger("database.migrations")
 
 # The version the application expects. Bump this and add a migration when
 # the schema changes.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA_MIGRATIONS_TABLE = "schema_migrations"
 
@@ -164,9 +164,60 @@ def _create_initial_schema(connection: sqlite3.Connection) -> None:
     )
 
 
+def _create_enrollment_audit_table(connection: sqlite3.Connection) -> None:
+    """Create the enrollment audit table.
+
+    The table records that an enrollment happened and who authorized it.
+    It deliberately holds no biometric material: no image, no embedding,
+    and no face crop. The embedding is identified by a digest so that a
+    specific template can be traced without storing the template itself.
+    """
+
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS enrollment_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            student_id TEXT NOT NULL,
+
+            enrolled_at TEXT NOT NULL,
+
+            operator TEXT NOT NULL,
+
+            consent_reference TEXT NOT NULL,
+
+            source_name TEXT,
+
+            embedding_digest TEXT,
+
+            outcome TEXT NOT NULL,
+
+            detail TEXT
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_enrollment_audit_student
+        ON enrollment_audit (student_id, enrolled_at)
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_enrollment_audit_enrolled_at
+        ON enrollment_audit (enrolled_at)
+        """
+    )
+
+
 # Ordered list of migrations. Each entry is (version, name, function).
 MIGRATIONS = [
     (1, "initial_schema", _create_initial_schema),
+    (2, "enrollment_audit", _create_enrollment_audit_table),
 ]
 
 

@@ -169,7 +169,7 @@ def test_existing_database_is_upgraded_and_version_recorded(tmp_path):
 
     applied = ensure_schema(database_path)
 
-    assert applied == [1]
+    assert applied == list(range(1, SCHEMA_VERSION + 1))
     assert get_current_schema_version(database_path) == SCHEMA_VERSION
     assert EXPECTED_TABLES.issubset(table_names(database_path))
 
@@ -330,12 +330,14 @@ def test_failed_migration_rolls_back_and_raises(tmp_path, monkeypatch):
         )
         raise sqlite3.OperationalError("simulated migration failure")
 
+    failing_version = SCHEMA_VERSION + 1
+
     monkeypatch.setattr(
         migration_module,
         "MIGRATIONS",
         [
             *MIGRATIONS,
-            (2, "failing", _failing_migration),
+            (failing_version, "failing", _failing_migration),
         ],
     )
 
@@ -354,8 +356,8 @@ def test_failed_migration_rolls_back_and_raises(tmp_path, monkeypatch):
     finally:
         connection.close()
 
-    assert 2 not in applied
-    assert 1 in applied
+    assert failing_version not in applied
+    assert SCHEMA_VERSION in applied
 
 
 def test_failed_migration_leaves_the_previous_version_applied(
@@ -374,7 +376,7 @@ def test_failed_migration_leaves_the_previous_version_applied(
         "MIGRATIONS",
         [
             *MIGRATIONS,
-            (2, "failing", _failing_migration),
+            (SCHEMA_VERSION + 1, "failing", _failing_migration),
         ],
     )
 
@@ -398,14 +400,14 @@ def test_migration_error_message_names_the_failing_version(
         "MIGRATIONS",
         [
             *MIGRATIONS,
-            (2, "failing", _failing_migration),
+            (SCHEMA_VERSION + 1, "failing", _failing_migration),
         ],
     )
 
     with pytest.raises(MigrationError) as error:
         ensure_schema(database_path)
 
-    assert "2" in str(error.value)
+    assert str(SCHEMA_VERSION + 1) in str(error.value)
     assert "failing" in str(error.value)
 
 
@@ -419,7 +421,7 @@ def test_apply_migrations_returns_only_newly_applied_versions(tmp_path):
         first = apply_migrations(connection)
         second = apply_migrations(connection)
 
-        assert first == [1]
+        assert first == list(range(1, SCHEMA_VERSION + 1))
         assert second == []
     finally:
         connection.close()

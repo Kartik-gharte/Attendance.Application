@@ -105,3 +105,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - `docs/ISSUE_AUDIT.md`, `docs/ISSUE_BACKLOG.md`, and `docs/PROJECT_STATUS.md` updated to the verified state after PRs #26, #29, #30, #31, #32, #33, #34, and #35. The audit records that issues #8 and #10 were previously reported as complete while the code had not reached `main`, and how each was corrected.
+
+### Added
+- An enrollment audit trail. Every enrollment is recorded in the new `enrollment_audit` table with the operator, the time, the consent reference, the source image file name, a digest of the stored embedding, and the outcome. The trail holds no biometric material: no image, no embedding, and no face crop.
+- `app/services/enrollment_audit.py` with `record_enrollment()`, `list_enrollments()`, `embedding_digest()`, and `delete_old_enrollment_audit()`.
+- Migration 2 creates the `enrollment_audit` table. The schema version is now 2.
+- The enrollment command accepts `--operator`, `--consent-reference`, `--database-path`, and `--no-audit`.
+- `tests/runtime/test_enrollment_audit.py` covering the recorded content, the refusals, the retention, the guarantee that no biometric material is recorded, and the enrollment workflow integration.

@@ -181,6 +181,7 @@ CLI enrollment (app/services/register_face.py)
   -> resolve destination inside the configured embedding directory
   -> refuse to replace an existing embedding without --overwrite
   -> write to a temporary file, then move into place
+  -> record the outcome in the enrollment_audit table
 
 CLI recognition (app/services/recognize_face.py)
   -> validate student identifier
