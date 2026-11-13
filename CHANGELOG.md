@@ -105,3 +105,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - `docs/ISSUE_AUDIT.md`, `docs/ISSUE_BACKLOG.md`, and `docs/PROJECT_STATUS.md` updated to the verified state after PRs #26, #29, #30, #31, #32, #33, #34, and #35. The audit records that issues #8 and #10 were previously reported as complete while the code had not reached `main`, and how each was corrected.
+
+### Added
+- Backup retention. A backup is removed when it is older than `BACKUP_RETENTION_DAYS` or when it falls outside the newest `BACKUP_RETENTION_COUNT` backups. The newest backup is always kept, so a misconfigured policy cannot empty the backup directory. Only directories that follow the backup naming convention and contain a manifest are considered, so an unrelated directory in the backup root is never deleted.
+- `python -m app.database.backup prune`, with `--dry-run` to report what would be removed without deleting it.
+- `BACKUP_RETENTION_DAYS`, `BACKUP_RETENTION_COUNT`, and `BACKUP_PRUNE_ON_CREATE` settings. Pruning runs automatically after a backup is created.
+- `tests/runtime/test_backup_retention.py` covering both limits, the safety rule, the directory guard, the dry run, and the command line interface.
