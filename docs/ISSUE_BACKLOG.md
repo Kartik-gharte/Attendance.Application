@@ -1,6 +1,6 @@
 # Issue Backlog — Prioritized Execution Queue
 
-**As of:** 2026-11-12
+**As of:** 2026-11-13
 
 All twelve tracked issues have been worked. Ten are complete and merged.
 This document records what remains and what would be done next.
@@ -56,26 +56,38 @@ These are recorded for traceability. They need no further action.
 | #10 | #27, #30 | Parameterized enrollment, recognition, and manual client; atomic writes; overwrite protection; 22 tests |
 | #12 | #31, #32, #33, #34 | Versioned migrations, backup and restore, health and readiness endpoints, deployment baseline and runbook |
 
+### Follow-up work delivered
+
+| Work | PR | Summary |
+|---|---|---|
+| Backup retention policy | #37 | Old backups are pruned by age and count. The newest backup is always kept. |
+| Enrollment audit trail | #38 | Every enrollment is recorded with the operator and the consent reference. No biometric material is stored. |
+| Dead code removal | #39 | `attendance_already_marked()` deleted, unused imports removed, and the `app auth cleanup` command fixed to actually delete. |
+| Metrics endpoint | #40 | Prometheus text format with route labels that cannot contain personal data. |
+
+The test suite went from 65 to 258 across this work.
+
 ---
 
 ## Follow-up Work Not Tracked by an Issue
 
 These were identified while working the cycle. None is urgent, and none has an acceptance criterion yet.
 
-| Item | Where it is recorded | Priority |
-|---|---|---|
-| Enable branch protection on `main` requiring the `Compile and test` and `Secret scan` checks | KI-018 | P1 — needs owner action in the repository settings |
-| Remove the unused service methods (`attendance_already_marked`, `verify_attendance`, `verify_face_from_frame`) | KI-019 | P3 |
-| Encrypt backups at rest | `docs/DATABASE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 |
-| Add a backup retention policy so old backups do not accumulate | `docs/DATABASE.md` | P2 |
-| Schedule backups automatically | `docs/DEPLOYMENT.md` | P2 |
-| Load test the attendance verification path with real faces | `docs/ROADMAP.md` | P2 — depends on a dataset |
-| Add metrics and tracing | `docs/ROADMAP.md`, `docs/DEPLOYMENT.md` | P2 |
-| Add an authenticated admin enrollment API | `docs/ARCHITECTURE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 |
-| Add an enrollment audit trail and a consent record | `docs/SECURITY_AND_PRIVACY.md` | P2 |
-| Support multiple workers with a shared liveness session store | `docs/DEPLOYMENT.md` | P2 |
-| Add a schema downgrade path | `docs/DATABASE.md` | P3 |
-| Checksum the migrations so a modified applied migration is detected | `docs/DATABASE.md` | P3 |
+| Item | Where it is recorded | Priority | State |
+|---|---|---|---|
+| Enable branch protection on `main` requiring the `Compile and test` and `Secret scan` checks | KI-018 | P1 | Open — needs owner action in the repository settings |
+| Encrypt backups at rest | `docs/DATABASE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 | Open — needs a crypto dependency, which is not currently justified |
+| Schedule backups automatically | `docs/DEPLOYMENT.md` | P2 | Open |
+| Load test the attendance verification path with real faces | `docs/ROADMAP.md` | P2 | Open — depends on a dataset |
+| Add tracing and alerting | `docs/ROADMAP.md`, `docs/DEPLOYMENT.md` | P2 | Open — the metrics are there to be scraped |
+| Add an authenticated admin enrollment API | `docs/ARCHITECTURE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 | Open |
+| Support multiple workers with a shared liveness session store | `docs/DEPLOYMENT.md` | P2 | Open |
+| Add a schema downgrade path | `docs/DATABASE.md` | P3 | Open |
+| Checksum the migrations so a modified applied migration is detected | `docs/DATABASE.md` | P3 | Open |
+| Remove the unused service methods (`attendance_already_marked`, `verify_attendance`, `verify_face_from_frame`) | KI-019 | P3 | Closed — `attendance_already_marked()` was deleted; the other two are used by `manual/attendance_verification.py` |
+| Add a backup retention policy so old backups do not accumulate | `docs/DATABASE.md` | P2 | Closed — PR #37 |
+| Add metrics | `docs/ROADMAP.md`, `docs/DEPLOYMENT.md` | P2 | Closed — PR #40 |
+| Add an enrollment audit trail and a consent record | `docs/SECURITY_AND_PRIVACY.md` | P2 | Closed — PR #38, for the trail and the reference. The consent record itself is kept outside the application. |
 
 ---
 
@@ -95,8 +107,12 @@ These were identified while working the cycle. None is urgent, and none has an a
 |---|---|---|---|---|
 | 1 | #11 — accuracy evaluation | P2 | `feat/evaluation-run` | Assemble a consented dataset |
 | 2 | Branch protection | P1 | — | Owner action in the repository settings |
-| 3 | Backup encryption and retention | P2 | `feat/backup-hardening` | Implement |
+| 3 | Backup encryption at rest | P2 | `feat/backup-encryption` | Decide on a crypto dependency, then implement |
 | 4 | Automatic backup schedule | P2 | `feat/backup-schedule` | Implement |
-| 5 | Metrics and tracing | P2 | `feat/observability` | Implement |
-| 6 | Dead code removal | P3 | `chore/remove-dead-code` | Implement |
-| 7 | #13 — close the tracking issue | P2 | — | Close after #11 |
+| 5 | Tracing and alerting | P2 | `feat/observability` | Implement on top of the metrics |
+| 6 | Load test the verification path | P2 | `test/load-verification` | Needs a dataset |
+| 7 | Admin enrollment API | P2 | `feat/enrollment-api` | Implement |
+| 8 | Multi-worker session store | P2 | `feat/shared-session-store` | Implement |
+| 9 | Schema downgrade path | P3 | `feat/schema-downgrade` | Implement |
+| 10 | Migration checksums | P3 | `feat/migration-checksums` | Implement |
+| 11 | #13 — close the tracking issue | P2 | — | Close after #11 |
