@@ -146,3 +146,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 - `app/utils/`. It was an empty package that nothing imported.
+
+### Added
+- Backup encryption. The backup files are encrypted by default with AES-256-GCM, using a key derived from a passphrase with scrypt. Every file gets a fresh random nonce, the stored file name is bound to the ciphertext as associated data so an encrypted file cannot be swapped for another one, and the encryption is authenticated so a modified file fails to decrypt rather than producing garbage. The manifest records the key derivation parameters and the salt, and the checksum is of the plaintext so a swapped file is detected after decryption.
+- `app/core/crypto.py` with the key derivation and the authenticated encryption helpers.
+- `BACKUP_ENCRYPTION` and `BACKUP_PASSPHRASE` settings.
+- `tests/runtime/test_encrypted_backup.py` covering the key derivation, the cipher, the passphrase source, the encrypted creation, the verification, and the restore.
+
+### Changed
+- The passphrase is never accepted as a command line argument. It comes from `BACKUP_PASSPHRASE` or from an interactive prompt, because process arguments are visible to other users on the machine.
+- With encryption enabled and no passphrase available, a backup now fails loudly instead of writing a plaintext copy of biometric data. Set `BACKUP_ENCRYPTION=false` to store a backup without encryption.
+- `cryptography==50.0.2` was added to `requirements.txt`.
+
+### Fixed
+- The runtime test suite no longer writes to the developer's real data directory. A shared fixture points the configured embedding directory and database path at a temporary directory, and the module-level path constants are corrected for modules that were already imported.

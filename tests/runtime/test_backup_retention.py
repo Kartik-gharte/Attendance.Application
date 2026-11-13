@@ -46,6 +46,16 @@ def make_backup(backup_dir: Path, age_days: float = 0.0) -> Path:
     return path
 
 
+def create_plain_backup(**kwargs):
+    """Create a backup without encryption.
+
+    The encrypted path is covered in test_encrypted_backup.py. These tests
+    exercise the plaintext path.
+    """
+
+    return create_backup(encrypt=False, **kwargs)
+
+
 @pytest.fixture
 def seeded_database(tmp_path):
     from app.auth.service import initialize_auth_database
@@ -216,7 +226,7 @@ def test_create_backup_prunes_expired_backups(tmp_path, seeded_database):
 
     make_backup(backup_dir, age_days=120)
 
-    create_backup(
+    create_plain_backup(
         backup_dir=backup_dir,
         database_path=seeded_database,
         prune=True,
@@ -234,7 +244,7 @@ def test_create_backup_can_skip_pruning(tmp_path, seeded_database):
 
     make_backup(backup_dir, age_days=120)
 
-    create_backup(
+    create_plain_backup(
         backup_dir=backup_dir,
         database_path=seeded_database,
         prune=False,
@@ -247,7 +257,7 @@ def test_pruning_never_removes_the_backup_just_created(tmp_path, seeded_database
     backup_dir = tmp_path / "backups"
     backup_dir.mkdir()
 
-    path = create_backup(
+    path = create_plain_backup(
         backup_dir=backup_dir,
         database_path=seeded_database,
         prune=True,
@@ -333,7 +343,13 @@ def test_cli_prune_dry_run_keeps_everything(tmp_path):
     assert len(list_backups(backup_dir)) == 2
 
 
-def test_cli_create_can_skip_pruning(tmp_path, seeded_database):
+def test_cli_create_can_skip_pruning(
+    tmp_path,
+    seeded_database,
+    monkeypatch,
+):
+    monkeypatch.setenv("BACKUP_PASSPHRASE", "test-passphrase")
+
     backup_dir = tmp_path / "backups"
     backup_dir.mkdir()
 

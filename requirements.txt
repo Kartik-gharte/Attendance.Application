@@ -13,3 +13,6 @@ onnxruntime==1.31.1
 pydantic-settings==2.16.2
 requests==2.34.2
 argon2-cffi==25.1.0
+# Encrypts the backup files, which hold the face embeddings and the
+# attendance records. Provides AES-256-GCM and scrypt.
+cryptography==50.0.2
