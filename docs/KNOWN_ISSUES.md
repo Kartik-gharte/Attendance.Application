@@ -26,7 +26,7 @@ Severity is a triage aid, not a formal risk rating.
 | KI-016 | Medium | Registration and client paths/IDs are hardcoded | **Resolved**. Enrollment and recognition are parameterized functions with CLI entry points; the manual API client and the manual demo scripts read their values from arguments or environment variables. Windows paths removed. |
 | KI-017 | Medium | Logs contain personal data and use `print()` | **Resolved** (branch `fix/structured-logging`). Logging module configured once at startup; operational `print()` calls replaced with leveled log calls; redaction factory masks credentials, session IDs, and embedding vectors; log capture tests assert sensitive values are absent. |
 | KI-018 | Medium | No CI or verified branch protection | CI workflow merged; branch protection not configured (requires manual enablement) |
-| KI-019 | Low | Dead/duplicate code paths and scripts | **Partially resolved**. The hardcoded scripts were replaced by parameterized workflows and the duplicate broken test module was removed. Remaining dead code is tracked separately. |
+| KI-019 | Low | Dead/duplicate code paths and scripts | **Resolved**. The hardcoded scripts were replaced by parameterized workflows, the duplicate broken test module was removed, the unused `attendance_already_marked()` was deleted, and the unused imports were removed. The cleanup command that was silently doing nothing now works. |
 | KI-020 | High | Anti-spoofing effectiveness is unmeasured | **Partially resolved**. A reproducible evaluation harness with dataset validation, per-attempt scoring, FAR/FRR/ROC/EER metrics, and Wilson intervals is implemented and tested. Blocked on a consented evaluation dataset; see issue #11. |
 
 ## Details
@@ -169,8 +169,8 @@ Severity is a triage aid, not a formal risk rating.
 
 - **Evidence:** `attendance_already_marked()` is unused; `AttendanceVerificationService.verify_attendance()` and `verify_face_from_frame()` are not used by the API; multiple overlapping camera scripts exist; `test_liveness_service.py` duplicates `tests/services/test_liveness_service.py`.
 - **Impact:** Confusing ownership and maintenance risk.
-- **Resolution:** The hardcoded scripts were replaced by parameterized workflows and the duplicate broken test module was removed. A remaining pass over the unused service methods is still open.
-- **Status:** Partially resolved; low priority.
+- **Resolution:** The hardcoded scripts were replaced by parameterized workflows and the duplicate broken test module was removed. A repository-wide scan found one genuinely unused function, `attendance_already_marked()`, which was deleted, together with the unused imports across `app/`, `tests/`, and `manual/`. The scan also uncovered a defect: the `app auth cleanup` command was defined in the argument parser but had no handler, so it exited successfully without deleting anything. The handler is now implemented and covered by `tests/runtime/test_auth_cli.py`.
+- **Status:** Resolved.
 
 ### KI-020 — Anti-spoofing effectiveness is unmeasured
 

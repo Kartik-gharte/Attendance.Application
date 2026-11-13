@@ -61,51 +61,6 @@ def initialize_database(database_path=None):
 
 
 # =========================================================
-# CHECK DUPLICATE ATTENDANCE
-# =========================================================
-
-def attendance_already_marked(
-    student_id,
-    lecture_id,
-    attendance_date,
-    database_path=None
-):
-    """
-    Check whether a student has already marked
-    attendance for the specified lecture and date.
-    """
-
-    connection = get_connection(database_path)
-
-    try:
-
-        cursor = connection.cursor()
-
-        cursor.execute(
-            """
-            SELECT id
-            FROM attendance
-            WHERE student_id = ?
-            AND lecture_id = ?
-            AND attendance_date = ?
-            """,
-            (
-                student_id,
-                lecture_id,
-                attendance_date
-            )
-        )
-
-        row = cursor.fetchone()
-
-        return row is not None
-
-    finally:
-
-        connection.close()
-
-
-# =========================================================
 # MARK ATTENDANCE
 # =========================================================
 

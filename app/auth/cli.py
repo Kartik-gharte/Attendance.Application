@@ -10,6 +10,7 @@ from app.auth.service import (
     set_password,
 )
 from app.database.attendance_db import delete_old_attendance
+from app.services.enrollment_audit import delete_old_enrollment_audit
 from app.core.config import get_settings
 
 
@@ -139,6 +140,26 @@ def main(argv: list[str] | None = None) -> int:
             )
 
             print(f"Deactivated '{args.username}'")
+
+        elif args.command == "cleanup":
+            deleted = delete_old_attendance(
+                database_path=database_path,
+                retention_days=args.retention_days,
+            )
+
+            deleted_audit = delete_old_enrollment_audit(
+                database_path=database_path,
+                retention_days=args.retention_days,
+            )
+
+            print(
+                f"Deleted {deleted} attendance record(s) older than "
+                f"{args.retention_days} days"
+            )
+            print(
+                f"Deleted {deleted_audit} enrollment audit entr(y/ies) "
+                f"older than {args.retention_days} days"
+            )
 
     except ValueError as error:
         # Errors are reported through the logger so that the redaction

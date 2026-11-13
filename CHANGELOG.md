@@ -116,3 +116,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `python -m app.database.backup prune`, with `--dry-run` to report what would be removed without deleting it.
 - `BACKUP_RETENTION_DAYS`, `BACKUP_RETENTION_COUNT`, and `BACKUP_PRUNE_ON_CREATE` settings. Pruning runs automatically after a backup is created.
 - `tests/runtime/test_backup_retention.py` covering both limits, the safety rule, the directory guard, the dry run, and the command line interface.
+
+### Fixed
+- The `app auth cleanup` command now deletes the records that are past the retention period. The subcommand was defined in the argument parser but had no handler, so it exited successfully without deleting anything.
+- The cleanup command also removes the enrollment audit entries that are past the retention period, because the audit trail holds a student identifier.
+
+### Removed
+- `attendance_already_marked()` in `app/database/attendance_db.py`. It was never called; the duplicate protection is enforced by the unique constraint that `mark_attendance()` already handles.
+- The unused imports across `app/`, `tests/`, and `manual/`.
+
+### Added
+- `tests/runtime/test_auth_cli.py` covering the cleanup command: it deletes the old attendance records, it deletes the old enrollment audit entries, it keeps the recent records, it succeeds on an empty database, and it actually deletes something.
