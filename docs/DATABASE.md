@@ -285,6 +285,27 @@ If the restore fails, the safety copy is put back.
 To restore into a new location, omit `--overwrite` and point
 `--database-path` at a path that does not exist yet.
 
+### Retention
+
+Backups are pruned so that biometric templates and personal data do not
+accumulate without bound.
+
+- A backup older than `BACKUP_RETENTION_DAYS` (default 30) is removed.
+- At most `BACKUP_RETENTION_COUNT` backups (default 14) are kept.
+- The newest backup is always kept, so a misconfigured policy cannot
+  empty the backup directory.
+- Only directories that follow the backup naming convention and contain a
+  manifest are considered. An unrelated directory in the backup root is
+  never deleted.
+
+Pruning runs automatically after a backup is created. It can also be run
+on its own, and with `--dry-run` to see what would be removed:
+
+```bash
+python -m app.database.backup prune --dry-run
+python -m app.database.backup prune
+```
+
 ### Recommended schedule
 
 The project does not schedule backups automatically. A minimal schedule:

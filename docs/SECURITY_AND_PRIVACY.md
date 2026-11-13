@@ -214,6 +214,12 @@ requires, and deleted when it is no longer needed. Backups must not be
 committed to the repository. The `data/` directory is gitignored, and the
 default backup location lives inside it.
 
+Old backups are pruned automatically so that copies of biometric
+templates do not accumulate. A backup is removed when it is older than
+`BACKUP_RETENTION_DAYS` or when it falls outside the newest
+`BACKUP_RETENTION_COUNT` backups. The newest backup is always kept. See
+[DATABASE.md](DATABASE.md).
+
 ## Health endpoints
 
 The health and readiness endpoints are unauthenticated so that a process

@@ -183,6 +183,26 @@ class Settings(BaseSettings):
         description="Number of days to retain attendance records before automatic deletion"
     )
 
+    backup_retention_days: int = Field(
+        default=30,
+        ge=1,
+        validation_alias="BACKUP_RETENTION_DAYS",
+        description="Number of days to keep a backup before it is pruned",
+    )
+
+    backup_retention_count: int = Field(
+        default=14,
+        ge=1,
+        validation_alias="BACKUP_RETENTION_COUNT",
+        description="Maximum number of backups to keep, regardless of age",
+    )
+
+    backup_prune_on_create: bool = Field(
+        default=True,
+        validation_alias="BACKUP_PRUNE_ON_CREATE",
+        description="Prune expired backups automatically after a backup is created",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

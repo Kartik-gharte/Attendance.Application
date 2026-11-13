@@ -196,3 +196,29 @@ narrow it with `--output-dir` but cannot point it outside that directory.
 The manual scripts under `manual/` are opt-in developer tools. They are not
 part of the supported runtime workflow and are not covered by the API
 contract.
+## Backup retention
+
+Backups contain biometric templates and personal data, so old copies are
+removed automatically.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `BACKUP_RETENTION_DAYS` | `30` | A backup older than this many days is removed. |
+| `BACKUP_RETENTION_COUNT` | `14` | At most this many backups are kept, regardless of age. |
+| `BACKUP_PRUNE_ON_CREATE` | `true` | Prune expired backups automatically after a backup is created. |
+
+The two limits apply independently. A backup is removed when it is older
+than the age limit or when it falls outside the newest backups. The newest
+backup is always kept, so a misconfigured policy cannot empty the backup
+directory.
+
+Only directories that follow the backup naming convention and contain a
+manifest are considered. An unrelated directory in the backup root is
+never deleted.
+
+Pruning can also be run on its own:
+
+```bash
+python -m app.database.backup prune --dry-run
+python -m app.database.backup prune
+```
