@@ -4,6 +4,7 @@ from typing import Callable
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.admin_routes import router as admin_router
 from app.api.health_routes import router as health_router
 from app.api.metrics_routes import install_metrics_middleware
 from app.api.metrics_routes import router as metrics_router
@@ -71,6 +72,7 @@ def create_app(
     application.include_router(auth_router)
     application.include_router(health_router)
     application.include_router(metrics_router)
+    application.include_router(admin_router)
 
     install_metrics_middleware(application)
 

@@ -157,6 +157,7 @@ def register_face(
     consent_reference: str | None = None,
     database_path=None,
     audit: bool = True,
+    embedding_dir: str | Path | None = None,
 ) -> str | None:
     """Enroll a face embedding for a student.
 
@@ -177,6 +178,8 @@ def register_face(
         database_path: Database the audit entry is written to.
         audit: Whether to record an audit entry. A dry run is never
             audited, because nothing was enrolled.
+        embedding_dir: The embedding directory the template is written
+            into. Defaults to the configured embedding directory.
 
     Returns:
         The path of the written embedding, or ``None`` when the enrollment
@@ -244,6 +247,7 @@ def register_face(
         destination = resolve_embedding_path(
             validated_student_id,
             output_dir,
+            embedding_dir,
         )
 
     except EnrollmentError as error:

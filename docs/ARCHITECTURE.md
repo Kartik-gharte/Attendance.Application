@@ -197,9 +197,34 @@ API path (POST /attendance/verify)
 ```
 
 The CLI workflows are controlled local operations. They write and read
-biometric templates on the operator's machine and are not exposed through the
-API. The API path never accepts an embedding from a client and never lets a
-caller choose where an embedding is read from or written to.
+biometric templates on the operator's machine. The API path never accepts
+an embedding from a client and never lets a caller choose where an
+embedding is read from or written to.
+
+### Admin enrollment path
+
+```
+POST /admin/enrollments  (bearer, admin)
+  -> validate the student identifier
+  -> require a non-blank consent reference
+  -> read the image, bounded by the upload limit
+  -> write the image to a temporary file
+  -> register_face(...)
+       -> validate the identifier
+       -> detect exactly one face (InsightFace)
+       -> resolve the destination inside the configured embedding directory
+       -> refuse to replace an existing embedding without --overwrite
+       -> write to a temporary file, then move into place
+       -> record the outcome in the enrollment_audit table
+  -> remove the temporary image
+```
+
+The endpoint and the CLI share the same enrollment service and write the
+same audit entries, so the trail does not depend on how the enrollment was
+performed.
+
+An administrator may read the trail with `GET /admin/enrollments`. The
+entries hold no biometric material.
 
 The manual API client under `manual/api_attendance.py` drives the API path
 from a camera. It reads its student, subject, lecture, and server values

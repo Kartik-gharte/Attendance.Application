@@ -162,5 +162,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The runtime test suite no longer writes to the developer's real data directory. A shared fixture points the configured embedding directory and database path at a temporary directory, and the module-level path constants are corrected for modules that were already imported.
 
 ### Added
+- An admin enrollment API. `POST /admin/enrollments` enrolls a face embedding and requires an administrator account; a student account receives `403`. The source image is written to a temporary file and removed afterwards, so it is never stored. Every enrollment, including a refused one, is recorded in the audit trail with the operator and the consent reference.
+- `GET /admin/enrollments` returns the enrollment audit entries for an administrator. The entries hold no biometric material.
+- `tests/runtime/test_admin_enrollment.py` covering the authorization boundary, the validation, the audit trail, and the guarantee that the source image is not stored.
 - `manual/verify_model_pipeline.py`, which loads the real MediaPipe and InsightFace models and drives the actual pipeline. It verifies that both models load, that the liveness and face paths run on a real frame and a real image, that the pipeline rejects an image with no face, and that the attendance path stores nothing when the face does not match. It exits nonzero when the pipeline misbehaves, so it can be used as a check.
 - `tests/runtime/test_real_model_pipeline.py`, which runs the same checks as an automated test when the model assets are provisioned and is skipped when they are not.
+
+### Changed
+- `register_face()` accepts the embedding directory explicitly, so the application configuration decides where a template is written rather than an import-time constant.
