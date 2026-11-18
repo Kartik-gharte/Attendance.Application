@@ -27,14 +27,15 @@ Safety rules
 
 import hashlib
 import json
+import shlex
 import shutil
 import sqlite3
-import textwrap
+import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from app.core.config import get_settings
+from app.core.config import PROJECT_ROOT, get_settings
 from app.core.crypto import (
     SCRYPT_N,
     SCRYPT_P,
@@ -975,39 +976,42 @@ def _verify_restored_database(
 # BACKUP SCHEDULING
 # =========================================================
 
-def backup_schedule(
-    schedule_type: str = "cron",
+def _resolve_schedule_path(value) -> Path:
+    """Resolve a path the same way the configuration resolves settings."""
+
+    path = Path(value).expanduser()
+
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+
+    return path.resolve()
+
+
+def _schedule_values(
     backup_dir=None,
     database_path=None,
     embedding_dir=None,
     retention_days=None,
     max_count=None,
-    liveness_seconds: int = 0,
-    include_embeddings: bool = True,
-) -> str:
-    """Generate a schedule entry for automated backups.
-
-    Returns a cron line or systemd timer unit file content that invokes
-    ``python -m app.database.backup create`` with the configured settings.
-
-    Args:
-        backup_dir: Directory that holds the backups. Defaults to the
-            configured backup directory.
-        database_path: Database to back up. Defaults to the configured
-            database.
-        embedding_dir: Embedding directory to back up. Defaults to the
-            configured embedding directory.
-        retention_days: Keep backups newer than this many days.
-        max_count: Keep at most this many backups.
-        liveness_seconds: Not used for scheduling, but accepted for
-            consistency with other commands.
-        include_embeddings: Whether to include face embeddings.
-
-    Returns:
-        A string containing the cron entry or systemd unit file content.
-    """
+) -> dict:
+    """Resolve the values that the generated command will use."""
 
     settings = get_settings()
+
+    if database_path is None:
+        database_path = settings.database_path
+
+    database_path = _resolve_schedule_path(database_path)
+
+    if embedding_dir is None:
+        embedding_dir = settings.embedding_dir
+
+    embedding_dir = _resolve_schedule_path(embedding_dir)
+
+    if backup_dir is None:
+        backup_dir = database_path.parent / "backups"
+
+    backup_dir = _resolve_schedule_path(backup_dir)
 
     if retention_days is None:
         retention_days = settings.backup_retention_days
@@ -1015,74 +1019,115 @@ def backup_schedule(
     if max_count is None:
         max_count = settings.backup_retention_count
 
-    if database_path is None:
-        database_path = settings.database_path
+    if retention_days < 1:
+        raise ValueError("retention_days must be at least 1")
 
-    if embedding_dir is None:
-        embedding_dir = settings.embedding_dir
+    if max_count < 1:
+        raise ValueError("max_count must be at least 1")
 
-    schedule_type = schedule_type.lower()
+    return {
+        "backup_dir": backup_dir,
+        "database_path": database_path,
+        "embedding_dir": embedding_dir,
+        "retention_days": retention_days,
+        "max_count": max_count,
+    }
 
-    if schedule_type == "cron":
-        return _cron_entry(
-            database_path=database_path,
-            embedding_dir=embedding_dir,
-            retention_days=retention_days,
-            max_count=max_count,
-            include_embeddings=include_embeddings,
-        )
 
-    if schedule_type == "systemd":
-        return _systemd_unit(
-            backup_dir=backup_dir,
-            database_path=database_path,
-            embedding_dir=embedding_dir,
-            retention_days=retention_days,
-            max_count=max_count,
-            include_embeddings=include_embeddings,
-        )
+def _backup_arguments(
+    values: dict,
+    include_embeddings: bool,
+    encrypt: bool,
+) -> list[str]:
+    """Return the create arguments for the generated command."""
 
-    raise ValueError(f"Unknown schedule type: {schedule_type}")
+    arguments = [
+        "--backup-dir",
+        str(values["backup_dir"]),
+        "--database-path",
+        str(values["database_path"]),
+        "--embedding-dir",
+        str(values["embedding_dir"]),
+        "--retention-days",
+        str(values["retention_days"]),
+        "--max-count",
+        str(values["max_count"]),
+    ]
+
+    if not include_embeddings:
+        arguments.append("--no-embeddings")
+
+    if not encrypt:
+        arguments.append("--no-encryption")
+
+    return arguments
 
 
 def _cron_entry(
+    backup_dir=None,
     database_path=None,
     embedding_dir=None,
     retention_days=None,
     max_count=None,
     include_embeddings: bool = True,
+    encrypt: bool = True,
 ) -> str:
-    """Generate a cron entry line for automated backups."""
+    """Return a cron entry that runs the backup every day at 02:00."""
 
-    database_path = database_path or get_settings().database_path
-    embedding_dir = embedding_dir or get_settings().embedding_dir
+    values = _schedule_values(
+        backup_dir=backup_dir,
+        database_path=database_path,
+        embedding_dir=embedding_dir,
+        retention_days=retention_days,
+        max_count=max_count,
+    )
 
-    cmd = [
-        "python",
-        "-m",
-        "app.database.backup",
-        "create",
-    ]
+    command = " ".join(
+        shlex.quote(part)
+        for part in [
+            sys.executable,
+            "-m",
+            "app.database.backup",
+            "create",
+            *_backup_arguments(values, include_embeddings, encrypt),
+        ]
+    )
 
-    if database_path:
-        cmd += [f"--database-path={database_path}"]
+    project_root = shlex.quote(str(PROJECT_ROOT))
 
-    if embedding_dir:
-        cmd.append(f"--embedding-dir={embedding_dir}")
+    lines = []
 
-    if not include_embeddings:
-        cmd.append("--no-embeddings")
+    if encrypt:
+        lines.append(
+            "# Set BACKUP_PASSPHRASE in the cron environment. An encrypted "
+            "backup fails without it."
+        )
 
-    if retention_days is not None:
-        cmd.append(f"--retention-days={retention_days}")
+    lines.append(f"0 2 * * * cd {project_root} && {command}")
 
-    if max_count is not None:
-        cmd.append(f"--max-count={max_count}")
+    return "\n".join(lines)
 
-    cmd_str = " ".join(cmd)
 
-    # Daily at 2:00 AM by default
-    return f"0 2 * * * {cmd_str}"
+def _systemd_quote(value: str) -> str:
+    """Quote a value for a systemd unit file."""
+
+    if not value:
+        return '""'
+
+    if all(
+        character.isalnum() or character in "/._-:=+@"
+        for character in value
+    ):
+        return value
+
+    escaped = (
+        value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("%", "%%")
+        .replace("$", "$$")
+    )
+
+    return f'"{escaped}"'
 
 
 def _systemd_unit(
@@ -1092,53 +1137,58 @@ def _systemd_unit(
     retention_days=None,
     max_count=None,
     include_embeddings: bool = True,
+    encrypt: bool = True,
 ) -> str:
-    """Generate a systemd service and timer unit file content."""
+    """Return a systemd service and timer for a daily backup."""
 
-    database_path = database_path or get_settings().database_path
-    embedding_dir = embedding_dir or get_settings().embedding_dir
+    values = _schedule_values(
+        backup_dir=backup_dir,
+        database_path=database_path,
+        embedding_dir=embedding_dir,
+        retention_days=retention_days,
+        max_count=max_count,
+    )
 
-    service_name = "attendance-backup.service"
-    timer_name = "attendance-backup.timer"
+    command = " ".join(
+        _systemd_quote(part)
+        for part in [
+            sys.executable,
+            "-m",
+            "app.database.backup",
+            "create",
+            *_backup_arguments(values, include_embeddings, encrypt),
+        ]
+    )
 
-    service_unit = f"""[Unit]
+    project_root = _systemd_quote(str(PROJECT_ROOT))
+
+    environment = _systemd_quote(f"PYTHONPATH={PROJECT_ROOT}")
+
+    service_unit = f"""# Save this block as attendance-backup.service.
+[Unit]
 Description=Attendance database backup
 
 [Service]
 Type=oneshot
-ExecStart=python -m app.database.backup create \
-  --database-path={database_path}"""
-
-    if embedding_dir:
-        service_unit += f" --embedding-dir={embedding_dir}"
-
-    if not include_embeddings:
-        service_unit += " --no-embeddings"
-
-    if retention_days is not None:
-        service_unit += f" --retention-days={retention_days}"
-
-    if max_count is not None:
-        service_unit += f" --max-count={max_count}"
-
-    service_unit += """
-
-[Install]
-WantedBy=multi-user.target
+WorkingDirectory={project_root}
+Environment={environment}
+EnvironmentFile=-/etc/attendance/backup.env
+ExecStart={command}
 """
 
-    timer_unit = f"""[Unit]
-Description=Run attendance backup daily
+    timer_unit = """# Save this block as attendance-backup.timer.
+[Unit]
+Description=Run the attendance database backup daily
 
 [Timer]
-OnCalendar=daily
+OnCalendar=*-*-* 02:00:00
 Persistent=true
 
 [Install]
 WantedBy=timers.target
 """
 
-    return f"{service_unit}\n\n{timer_unit}"
+    return f"{service_unit}\n{timer_unit}"
 
 
 def schedule_backup(
@@ -1149,72 +1199,33 @@ def schedule_backup(
     retention_days=None,
     max_count=None,
     include_embeddings: bool = True,
+    encrypt: bool | None = None,
 ) -> str:
-    """Generate a schedule entry for automated backups.
+    """Generate configuration for an automated backup.
 
-    Returns a cron line or systemd timer unit file content that invokes
-    ``python -m app.database.backup create`` with the configured settings.
+    Returns a cron entry or a systemd service and timer definition. The
+    generated command invokes ``python -m app.database.backup create``
+    with absolute paths and the configured retention limits.
 
-    Args:
-        backup_dir: Directory to write the backup into. Defaults to a
-            ``backups`` directory next to the database.
-        database_path: Database to back up. Defaults to the configured
-            database.
-        embedding_dir: Embedding directory to back up. Defaults to the
-            configured embedding directory.
-        retention_days: Keep backups newer than this many days.
-        max_count: Keep at most this many backups.
-        include_embeddings: Whether to include face embeddings.
-
-    Returns:
-        A string containing the cron entry or systemd timer unit content.
+    The passphrase is never included in the output. When encryption is
+    enabled, the generated schedule expects ``BACKUP_PASSPHRASE`` to be
+    present in its environment.
     """
 
-    return _schedule_backup(
-        schedule_type=schedule_type,
-        backup_dir=backup_dir,
-        database_path=database_path,
-        embedding_dir=embedding_dir,
-        retention_days=retention_days,
-        max_count=max_count,
-        include_embeddings=include_embeddings,
-    )
+    if encrypt is None:
+        encrypt = get_settings().backup_encryption
 
-
-def _schedule_backup(
-    schedule_type: str = "cron",
-    backup_dir=None,
-    database_path=None,
-    embedding_dir=None,
-    retention_days=None,
-    max_count=None,
-    include_embeddings: bool = True,
-) -> str:
-    """Internal implementation of schedule_backup."""
-
-    settings = get_settings()
-
-    if retention_days is None:
-        retention_days = settings.backup_retention_days
-
-    if max_count is None:
-        max_count = settings.backup_retention_count
-
-    if database_path is None:
-        database_path = settings.database_path
-
-    if embedding_dir is None:
-        embedding_dir = settings.embedding_dir
-
-    schedule_type = schedule_type.lower()
+    schedule_type = str(schedule_type).strip().lower()
 
     if schedule_type == "cron":
         return _cron_entry(
+            backup_dir=backup_dir,
             database_path=database_path,
             embedding_dir=embedding_dir,
             retention_days=retention_days,
             max_count=max_count,
             include_embeddings=include_embeddings,
+            encrypt=encrypt,
         )
 
     if schedule_type == "systemd":
@@ -1225,9 +1236,17 @@ def _schedule_backup(
             retention_days=retention_days,
             max_count=max_count,
             include_embeddings=include_embeddings,
+            encrypt=encrypt,
         )
 
     raise ValueError(f"Unknown schedule type: {schedule_type}")
+
+
+# =========================================================
+# COMMAND LINE INTERFACE
+# =========================================================
+
+def build_parser():
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -1284,13 +1303,6 @@ def _schedule_backup(
         "(defaults to the configured value)",
     )
     parser.add_argument(
-        "schedule",
-        nargs="?",
-        choices=["cron", "systemd"],
-        help="Print a schedule entry (cron or systemd) instead of creating "
-        "a backup",
-    )
-    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Report what would be pruned without deleting it",
@@ -1308,102 +1320,11 @@ def _schedule_backup(
         "from a terminal to be prompted.",
     )
     parser.add_argument(
-        "schedule",
+        "schedule_type",
         nargs="?",
+        default=None,
         choices=["cron", "systemd"],
-        help="Print a schedule entry for automated backups instead of creating one",
-    )
-
-    return parser
-
-
-def build_parser():
-    import argparse
-
-    from app.core.config import get_settings
-
-    parser = argparse.ArgumentParser(
-        description="Backup and restore the attendance database",
-    )
-
-    parser.add_argument(
-        "command",
-        choices=["create", "list", "verify", "restore", "prune", "schedule"],
-        help="Operation to perform",
-    )
-    parser.add_argument(
-        "--backup-dir",
-        default=None,
-        help="Directory that holds the backups",
-    )
-    parser.add_argument(
-        "--backup-path",
-        default=None,
-        help="Backup directory to verify or restore",
-    )
-    parser.add_argument(
-        "--database-path",
-        default=None,
-        help="Database path (defaults to the configured database path)",
-    )
-    parser.add_argument(
-        "--embedding-dir",
-        default=None,
-        help="Embedding directory (defaults to the configured directory)",
-    )
-    parser.add_argument(
-        "--no-embeddings",
-        action="store_true",
-        help="Do not include the face embeddings",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Allow the restore to replace an existing database",
-    )
-    parser.add_argument(
-        "--retention-days",
-        type=int,
-        default=None,
-        help="Keep backups newer than this many days "
-        "(defaults to the configured value)",
-    )
-    parser.add_argument(
-        "--max-count",
-        type=int,
-        default=None,
-        help="Keep at most this many backups "
-        "(defaults to the configured value)",
-    )
-    parser.add_argument(
-        "schedule",
-        nargs="?",
-        choices=["cron", "systemd"],
-        help="Print a schedule entry (cron or systemd) instead of creating "
-        "a backup",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Report what would be pruned without deleting it",
-    )
-    parser.add_argument(
-        "--no-prune",
-        action="store_true",
-        help="Do not prune expired backups after creating the backup",
-    )
-    parser.add_argument(
-        "--no-encryption",
-        action="store_true",
-        help="Store the backup without encryption. The passphrase is never "
-        "accepted as a command line argument; set BACKUP_PASSPHRASE or run "
-        "from a terminal to be prompted.",
-    )
-    parser.add_argument(
-        "schedule",
-        nargs="?",
-        choices=["cron", "systemd"],
-        help="Print a schedule entry for automated backups instead of creating one",
+        help="Schedule format for the schedule command (default: cron)",
     )
 
     return parser
@@ -1423,6 +1344,28 @@ def main(argv=None) -> int:
 
     try:
 
+        if args.command == "schedule":
+
+            try:
+                schedule = schedule_backup(
+                    schedule_type=args.schedule_type or "cron",
+                    backup_dir=args.backup_dir,
+                    database_path=args.database_path,
+                    embedding_dir=args.embedding_dir,
+                    retention_days=args.retention_days,
+                    max_count=args.max_count,
+                    include_embeddings=not args.no_embeddings,
+                    encrypt=False if args.no_encryption else None,
+                )
+
+            except ValueError as error:
+                logger.error("Backup schedule could not be generated: %s", error)
+                return 2
+
+            sys.stdout.write(schedule + "\n")
+
+            return 0
+
         if args.command == "create":
 
             path = create_backup(
@@ -1430,8 +1373,8 @@ def main(argv=None) -> int:
                 database_path=args.database_path,
                 embedding_dir=args.embedding_dir,
                 include_embeddings=not args.no_embeddings,
-                prune=not args.no_prune,
-                encrypt=not args.no_encryption,
+                prune=False if args.no_prune else None,
+                encrypt=False if args.no_encryption else None,
             )
 
             logger.info("Backup created at %s", path)

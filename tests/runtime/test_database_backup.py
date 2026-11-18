@@ -621,3 +621,35 @@ def test_cli_reports_a_failure_for_a_missing_database(tmp_path):
         )
         == 1
     )
+
+
+def test_cli_create_honors_the_configured_encryption(
+    tmp_path,
+    seeded_database,
+    monkeypatch,
+):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("BACKUP_ENCRYPTION", "false")
+    get_settings.cache_clear()
+
+    backup_root = tmp_path / "backups"
+
+    assert (
+        backup_module.main(
+            [
+                "create",
+                "--backup-dir",
+                str(backup_root),
+                "--database-path",
+                str(seeded_database),
+            ]
+        )
+        == 0
+    )
+
+    backups = list_backups(backup_root)
+
+    assert len(backups) == 1
+    assert (backups[0] / "attendance.db").is_file()
+    assert not (backups[0] / "attendance.db.enc").exists()
