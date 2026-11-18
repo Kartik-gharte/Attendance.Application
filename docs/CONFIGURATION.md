@@ -90,20 +90,20 @@ These are heuristic values, not calibrated or certified security thresholds.
 
 | Setting | Value | Location |
 | --- | --- | --- |
-| API base URL | `ATTENDANCE_API_URL`, default `http://127.0.0.1:8000` | `test_api_attendance.py` |
-| Login username | `ATTENDANCE_USERNAME`, default `student1` | `test_api_attendance.py` |
-| Login password | Prompted with `getpass` at runtime | `test_api_attendance.py` |
-| Student ID | `STU001` | `test_api_attendance.py`, registration scripts |
-| Subject | `Java Programming` | `test_api_attendance.py` |
-| Lecture ID | `JAVA-LECTURE-API-001` | `test_api_attendance.py` |
-| Registration output | `../../data/face_embeddings/STU001.npy` | `app/services/register_face.py` |
+| API base URL | `ATTENDANCE_API_URL`, default `http://127.0.0.1:8000` | `manual/api_attendance.py` |
+| Login username | `ATTENDANCE_USERNAME` | `manual/api_attendance.py` |
+| Login password | `ATTENDANCE_PASSWORD`, or prompted with `getpass` | `manual/api_attendance.py` |
+| Student ID | `ATTENDANCE_STUDENT_ID` | `manual/api_attendance.py` |
+| Subject | `ATTENDANCE_SUBJECT`, default `Java Programming` | `manual/api_attendance.py` |
+| Lecture ID | `ATTENDANCE_LECTURE_ID` | `manual/api_attendance.py` |
+| Camera index | `ATTENDANCE_CAMERA_INDEX`, default `0` | `manual/api_attendance.py` |
 
-The manual API client prompts for a password and obtains a bearer token from
-`POST /auth/token`. It reads `ATTENDANCE_API_URL` and `ATTENDANCE_USERNAME` from
-the environment. It still uses hardcoded values for the student ID, subject,
-and lecture, and the registration scripts still use hardcoded paths.
-Parameterizing the remaining values is tracked in
-[#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10).
+The manual API client prompts for a password when `ATTENDANCE_PASSWORD` is not
+set and obtains a bearer token from `POST /auth/token`. Its identifiers read
+from arguments or environment variables and have no hardcoded student ID,
+subject, or lecture. The enrollment CLI reads the student identifier and
+source image from arguments and writes inside the configured embedding
+directory.
 
 ## Account provisioning
 
@@ -125,8 +125,7 @@ reset and deactivation revoke all active tokens for that account.
 
 - Rate limiting, account lockout, and login audit logging.
 - SSO, institutional identity providers, and multi-factor authentication.
-- Structured, redacted logging ([#8](https://github.com/Kartik-gharte/Attendance.Application/issues/8)).
-- A configurable log level.
+- Tracing and alerting.
 
 Do not add secrets to source control or documentation.
 
@@ -249,3 +248,11 @@ loudly rather than writing a plaintext copy of biometric data. Set
 When a backup is encrypted, the stored files end in `.enc` and the
 manifest records the key derivation parameters and the salt. The salt is
 not secret.
+
+## Backup scheduling
+
+`python -m app.database.backup schedule cron` or `schedule systemd` prints a
+daily schedule that runs the `create` command with the resolved paths and the
+configured retention limits. The output never contains the passphrase. See
+[DATABASE.md](DATABASE.md) for installation steps and
+[DEPLOYMENT.md](DEPLOYMENT.md) for the operational procedure.
