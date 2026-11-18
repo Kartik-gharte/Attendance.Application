@@ -48,12 +48,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Known gaps
 
-- No CI workflow exists, and the broader automated test suite is still open (issue #7).
-- TLS, rate limiting, account lockout, MFA/SSO, and audit logging are not implemented.
-- Enrollment/subject authorization is still missing.
+- No consented evaluation dataset exists, so no accuracy has been measured (issue #11).
+- Branch protection on `main` is not configured.
+- TLS, rate limiting, account lockout, MFA/SSO, and comprehensive attendance audit logging are not implemented.
+- Live biometric storage is unencrypted, and there is no consent workflow.
 - Liveness session IDs remain in query strings and may be replayed by the same authenticated student within the validity window.
+- In-memory sessions are single-process only, and abandoned sessions are not swept in the background.
 - Anti-spoofing is heuristic screening, not a trained PAD model.
-- Startup is verified only on macOS arm64 with Python 3.11.16.
+- Startup is verified only on macOS arm64 with Python 3.11.16, and the attendance path has not been load tested with real faces.
 
 ### Added
 - `app/services/register_face.py` rewritten as a parameterized enrollment workflow with a `register_face()` function and a CLI entry point. Student identifiers are validated, the destination is resolved inside the configured embedding directory, existing embeddings are refused without `--overwrite`, and the embedding is written atomically.
@@ -170,3 +172,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 - `register_face()` accepts the embedding directory explicitly, so the application configuration decides where a template is written rather than an import-time constant.
+
+### Added
+- `python -m app.database.backup schedule cron|systemd` prints a ready-to-install backup schedule. The cron entry runs daily at 02:00 from the project root with the current interpreter, and the systemd units use `OnCalendar=*-*-* 02:00:00`, `Persistent=true`, the project root, and an optional `/etc/attendance/backup.env`. The generated command carries the configured paths, encryption setting, and retention limits; the passphrase is never emitted.
+- `tests/runtime/test_backup_schedule.py` covering both output formats, absolute paths, the passphrase warning, the embedding/encryption options, configured encryption, invalid formats and limits, the default, stdout, and the rejection path.
+
+### Fixed
+- The `schedule` command merged in PR #46 exits with the generated schedule instead of exiting silently. The parser had two definitions and two `schedule` arguments, and `main()` had no schedule branch.
+- `python -m app.database.backup create` now honors `BACKUP_ENCRYPTION` and `BACKUP_PRUNE_ON_CREATE` unless `--no-encryption` or `--no-prune` is passed, instead of always overriding the configured defaults.
+
+### Changed
+- Documentation updated through PRs #42–#46: current vs future architecture, public and admin endpoints, encrypted backups, enrollment, scheduling, test count (324), and remaining gaps.
