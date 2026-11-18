@@ -1,6 +1,6 @@
 # Issue Backlog — Prioritized Execution Queue
 
-**As of:** 2026-11-13
+**As of:** 2026-11-18
 
 All twelve tracked issues have been worked. Ten are complete and merged.
 This document records what remains and what would be done next.
@@ -64,8 +64,13 @@ These are recorded for traceability. They need no further action.
 | Enrollment audit trail | #38 | Every enrollment is recorded with the operator and the consent reference. No biometric material is stored. |
 | Dead code removal | #39 | `attendance_already_marked()` deleted, unused imports removed, and the `app auth cleanup` command fixed to actually delete. |
 | Metrics endpoint | #40 | Prometheus text format with route labels that cannot contain personal data. |
+| README accuracy pass | #42 | The README matches the implemented runtime, tests, and security posture. |
+| Encrypted backups | #43 | AES-256-GCM with a scrypt-derived key; plaintext never reaches the stored files. |
+| Real-model pipeline verification | #44 | The real MediaPipe and InsightFace assets are exercised on the rejection path. |
+| Admin enrollment API | #45 | Administrator-only enrollment and audit reads, sharing the CLI enrollment service. |
+| Scheduled backup command | #46 | Generates a cron entry or systemd units; repaired on `fix/backup-schedule-cli` so the CLI handler, parser, and output are correct. |
 
-The test suite went from 65 to 258 across this work.
+The test suite went from 65 to 324 across this work.
 
 ---
 
@@ -76,11 +81,11 @@ These were identified while working the cycle. None is urgent, and none has an a
 | Item | Where it is recorded | Priority | State |
 |---|---|---|---|
 | Enable branch protection on `main` requiring the `Compile and test` and `Secret scan` checks | KI-018 | P1 | Open — needs owner action in the repository settings |
-| Encrypt backups at rest | `docs/DATABASE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 | Open — needs a crypto dependency, which is not currently justified |
-| Schedule backups automatically | `docs/DEPLOYMENT.md` | P2 | Open |
+| Encrypt backups at rest | `docs/DATABASE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 | Closed — PR #43 |
+| Schedule backups automatically | `docs/DEPLOYMENT.md` | P2 | Closed — PR #46 and `fix/backup-schedule-cli` |
 | Load test the attendance verification path with real faces | `docs/ROADMAP.md` | P2 | Open — depends on a dataset |
 | Add tracing and alerting | `docs/ROADMAP.md`, `docs/DEPLOYMENT.md` | P2 | Open — the metrics are there to be scraped |
-| Add an authenticated admin enrollment API | `docs/ARCHITECTURE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 | Open |
+| Add an authenticated admin enrollment API | `docs/ARCHITECTURE.md`, `docs/SECURITY_AND_PRIVACY.md` | P2 | Closed — PR #45 |
 | Support multiple workers with a shared liveness session store | `docs/DEPLOYMENT.md` | P2 | Open |
 | Add a schema downgrade path | `docs/DATABASE.md` | P3 | Open |
 | Checksum the migrations so a modified applied migration is detected | `docs/DATABASE.md` | P3 | Open |
@@ -95,9 +100,9 @@ These were identified while working the cycle. None is urgent, and none has an a
 
 1. **#11** — assemble the consented dataset, run the evaluation, publish the measurements. Everything else in the backlog depends on this being the last accuracy blocker.
 2. **Branch protection** — one repository settings change. It is the only P1 item left and it is the owner's action, not a code change.
-3. **Backup encryption, retention, and scheduling** — closes the remaining data-protection gaps.
-4. **Metrics and tracing** — needed before any real deployment.
-5. **The P3 cleanups** — when there is time.
+3. **Shared liveness session store** — removes the single-worker constraint.
+4. **Tracing and alerting** — needed before any real deployment; the metrics are already exposed.
+5. **The P3 cleanups** — schema downgrade and migration checksums, when there is time.
 
 ---
 
@@ -107,12 +112,9 @@ These were identified while working the cycle. None is urgent, and none has an a
 |---|---|---|---|---|
 | 1 | #11 — accuracy evaluation | P2 | `feat/evaluation-run` | Assemble a consented dataset |
 | 2 | Branch protection | P1 | — | Owner action in the repository settings |
-| 3 | Backup encryption at rest | P2 | `feat/backup-encryption` | Decide on a crypto dependency, then implement |
-| 4 | Automatic backup schedule | P2 | `feat/backup-schedule` | Implement |
-| 5 | Tracing and alerting | P2 | `feat/observability` | Implement on top of the metrics |
-| 6 | Load test the verification path | P2 | `test/load-verification` | Needs a dataset |
-| 7 | Admin enrollment API | P2 | `feat/enrollment-api` | Implement |
-| 8 | Multi-worker session store | P2 | `feat/shared-session-store` | Implement |
-| 9 | Schema downgrade path | P3 | `feat/schema-downgrade` | Implement |
-| 10 | Migration checksums | P3 | `feat/migration-checksums` | Implement |
-| 11 | #13 — close the tracking issue | P2 | — | Close after #11 |
+| 3 | Multi-worker session store | P2 | `feat/shared-session-store` | Implement |
+| 4 | Tracing and alerting | P2 | `feat/observability` | Implement on top of the metrics |
+| 5 | Load test the verification path | P2 | `test/load-verification` | Needs a dataset |
+| 6 | Schema downgrade path | P3 | `feat/schema-downgrade` | Implement |
+| 7 | Migration checksums | P3 | `feat/migration-checksums` | Implement |
+| 8 | #13 — close the tracking issue | P2 | — | Close after #11 |
