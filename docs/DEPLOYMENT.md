@@ -180,8 +180,10 @@ consented dataset is available. See
 4. Provision the accounts with `python -m app.auth.cli create-user`.
 5. Apply the schema migrations with `python -m app.database.migrations upgrade`.
 6. Take a backup with `python -m app.database.backup create`.
-7. Start the service with a single worker.
-8. Check that `/health/ready` returns `200`.
+7. Install the backup schedule with `python -m app.database.backup schedule`
+   and confirm the passphrase is available to it.
+8. Start the service with a single worker.
+9. Check that `/health/ready` returns `200`.
 
 ### Backups
 
@@ -191,6 +193,21 @@ while the service is in use.
 ```bash
 python -m app.database.backup create
 ```
+
+Backups are encrypted by default. Provide `BACKUP_PASSPHRASE` through the
+environment; do not pass it as a command-line argument. Install a daily
+schedule rather than relying on a person:
+
+```bash
+python -m app.database.backup schedule cron       # a user crontab entry
+python -m app.database.backup schedule systemd    # service and timer units
+```
+
+When encryption is enabled, the scheduled command needs
+`BACKUP_PASSPHRASE` in its environment. The generated systemd service reads
+it from `/etc/attendance/backup.env`; set that file to `0600`. An encrypted
+backup fails rather than writing a plaintext copy when the passphrase is
+missing.
 
 Keep at least one backup off the machine that runs the service, and test a
 restore periodically. A backup that has never been restored is not a
@@ -253,7 +270,8 @@ The startup logs are on stderr. See
 - No rate limiting, account lockout, MFA, or SSO.
 - No audit log. The application log is diagnostic output, not a tamper
   evident record.
-- No automatic backup schedule.
+- No built-in scheduler daemon. The application prints a cron entry or
+  systemd units, and the operator installs them.
 - No tracing and no alerting. Metrics are exposed for a scraper to collect.
 - No measured accuracy for face recognition or presentation attack
   detection. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
