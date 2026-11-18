@@ -1,6 +1,6 @@
 # Project Status
 
-**As of:** 2026-11-13
+**As of:** 2026-11-18
 
 ## Repository state
 
@@ -25,11 +25,16 @@
 | Enrollment audit trail | Merged via PR #38 |
 | Dead code removal and the cleanup command fix | Merged via PR #39 |
 | Metrics endpoint | Merged via PR #40 |
+| README accuracy pass | Merged via PR #42 |
+| Encrypted backups | Merged via PR #43 |
+| Real-model pipeline verification | Merged via PR #44 |
+| Admin enrollment API | Merged via PR #45 |
+| Scheduled backup command | Merged via PR #46; the CLI handler and generated output were repaired on `fix/backup-schedule-cli` |
 | Remote branches | `main` plus merged topic branches; no branch is deleted |
 | Local backups | `refs/backup/feature-ai-attendance-security`, `refs/backup/feature-attendance-verification-stable`, `refs/backup/main-before-attendance-merge-2026-10-26`, `refs/backup/main-initial` |
 | Open stabilization backlog | [#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11) and [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13) |
 | CI | Compile, test, and secret-scan jobs pass on every pull request; branch protection is not configured |
-| Test suite | 258 runtime tests exist under `tests/runtime/` |
+| Test suite | 324 runtime tests exist under `tests/runtime/` |
 | Model assets | Provisioned on the development machine; MediaPipe Face Landmarker and InsightFace `buffalo_l` both load correctly |
 | Measured baseline | 2.3 s import, 165 MB resident without models, 1.0 s startup and 986 MB resident with them |
 
@@ -54,36 +59,37 @@
 | Blink liveness | Implemented, partially verified | MediaPipe landmarks + EAR threshold. The real model asset is provisioned, loads, and runs on a real frame. The blink detection itself is untested, because it needs a real face. |
 | Anti-spoofing screening | Implemented, unverified | Heuristic size/brightness/sharpness checks; not a trained PAD model. Effectiveness unmeasured. |
 | Face embedding/recognition | Implemented, partially verified | InsightFace `buffalo_l`, cosine similarity, configurable threshold. The real model asset is provisioned, loads, and runs on a real image. A successful match is untested, because it needs a real consented face. |
-| Attendance verification API | Implemented, partially verified | `POST /attendance/verify`; success, duplicate, validation, upload-limit, authentication, ownership, and retrieval-error paths tested with a temporary database and fake model services. Real model flow unverified. |
+| Attendance verification API | Implemented, partially verified | `POST /attendance/verify`; success, duplicate, validation, upload-limit, authentication, ownership, and retrieval-error paths tested with a temporary database and fake model services. The real-model rejection path is verified; a successful match needs a consented face. |
 | Attendance retrieval API | Implemented, verified without models | `GET /attendance/student/{student_id}` and `GET /attendance/all` return empty lists on a fresh initialized database. Students can read only their own records; admins can read all records. |
 | Authentication/authorization | Implemented, verified with temporary storage | Local Argon2id accounts, opaque bearer tokens with expiry/revocation, student/admin roles, and user-bound liveness sessions. Tested without real models. |
-| SQLite schema | Implemented, verified | The lifespan initializes `attendance`, `users`, and `auth_tokens` idempotently for `ATTENDANCE_DB_PATH` and preserves rows across restart. Tests cover fresh creation, retrieval, duplicate rejection, account provisioning, and token lifecycle. |
-| Enrollment/registration | Implemented, verified | `register_face()` with a CLI entry point; validated identifiers, path containment, overwrite protection, and atomic writes. CLI-only, no API. |
+| SQLite schema | Implemented, verified | The lifespan applies transactional, versioned migrations for `ATTENDANCE_DB_PATH`, creating `attendance`, `users`, `auth_tokens`, `schema_migrations`, and `enrollment_audit` as needed, and preserves rows across restart. |
+| Enrollment/registration | Implemented, verified | `register_face()` with a CLI entry point and an administrator-only `POST /admin/enrollments` endpoint; validated identifiers, path containment, overwrite protection, atomic writes, and an enrollment audit trail. |
+| Admin enrollment audit | Implemented, verified | `GET /admin/enrollments` returns the audit entries; no image, embedding, or face crop is stored. |
 | Startup resilience | Implemented, verified | Importing `app.main` does not touch models or the database; schema initialization and missing MediaPipe assets fail lifespan startup explicitly. |
-| Automated tests | Implemented, verified | 196 runtime tests cover settings, startup, the database, the API, validation, authentication, logging and redaction, migrations, backup and restore, health and readiness, the enrollment workflow, the evaluation harness, and the benchmark harness. |
+| Automated tests | Implemented, verified | 324 runtime tests cover settings, startup, the database, the API, validation, authentication, logging and redaction, migrations, backup and restore, backup encryption, backup retention, backup scheduling, health and readiness, the enrollment workflow and audit trail, the admin enrollment API, metrics, the evaluation harness, and the benchmark harness. |
 | Structured logging | Implemented, verified | Configured once at startup. A redaction record factory masks credentials, session identifiers, and embedding vectors at record creation. Tests assert sensitive values never reach the log stream. |
 | Schema migrations | Implemented, verified | Versioned, ordered, transactional. A failed migration rolls back completely. A database created before versioning existed is adopted at the baseline version. |
-| Backup and restore | Implemented, verified | Consistent copy via the SQLite online backup API, checksummed manifest, verification before restore, safety copy of the live database. |
+| Backup and restore | Implemented, verified | Consistent copy via the SQLite online backup API, checksummed manifest, verification before restore, safety copy of the live database, AES-256-GCM encryption, age/count retention, and generated cron/systemd schedules. |
 | Health and readiness | Implemented, verified | Liveness inspects nothing outside the process. Readiness verifies the database and the models and returns 503 when not ready. |
-| Deployment baseline | Implemented, verified | Requirements, single-worker constraint, TLS expectation, probe configuration, measured baseline, and a runbook in `docs/DEPLOYMENT.md`. |
+| Deployment baseline | Implemented, verified | Requirements, single-worker constraint, TLS expectation, probe configuration, measured baseline, backup schedule, and a runbook in `docs/DEPLOYMENT.md`. |
 | Evaluation harness | Implemented, verified | Dataset validation, FAR/FRR/ROC/EER, liveness success rate, and Wilson intervals. No accuracy figure has been produced. |
 | Syntax check | Verified | `python -m compileall -q app tests` passed. |
 | Lint/type checks | Not configured | No verified tool configuration exists. |
 | Observability | Partial | Structured, leveled, redacted logging with a configurable level and format. Metrics are exposed in the Prometheus text format with route labels that cannot contain personal data. No tracing and no alerting. |
-| CI | Implemented, verified | Compile, runtime tests, and gitleaks run on pull requests and `main`; both jobs passed on PR #22. Branch protection still requires owner action. |
-| Privacy controls | Partial | Git ignores biometric, account, token, and attendance data. Retention, deletion, backup and restore, backup retention, and an enrollment audit trail are implemented. The consent reference points at a record kept outside the application. |
-| Deployment | Partial | Requirements, constraints, probes, a measured baseline, and a runbook are documented. No container image, service unit, or reverse-proxy configuration. |
-| Project documentation | In progress | Runtime, database, configuration, API, security, authentication, and validation docs updated for the current implementation. |
+| CI | Implemented, verified | Compile, runtime tests, and gitleaks run on pull requests and `main`; both jobs passed on PRs through #46. Branch protection still requires owner action. |
+| Privacy controls | Partial | Git ignores biometric, account, token, and attendance data. Retention, deletion, encrypted backup and restore, backup retention, a generated backup schedule, and an enrollment audit trail are implemented. Live biometric storage is unencrypted, and the consent reference points at a record kept outside the application. |
+| Deployment | Partial | Requirements, constraints, probes, a measured baseline, a backup schedule generator, and a runbook are documented. No container image, installed service unit, or reverse-proxy configuration. |
+| Project documentation | Implemented | Runtime, database, configuration, API, security, deployment, testing, roadmap, and status docs updated through PR #46 and the scheduling repair. |
 
 ## What was actually verified
 
 On macOS 27.0.1 arm64 with Python 3.11.16:
 
 1. Clean virtual environment installed all runtime dependencies from `requirements.txt`, including `argon2-cffi`.
-2. `python -m pytest tests/runtime -q` passed (258 tests), including validation, upload-limit, retrieval-error, login/logout, token expiry/revocation, role, cross-student access, log redaction, schema migration and rollback, backup and restore, backup retention, health and readiness, the enrollment workflow, the enrollment audit trail, the metrics, the evaluation harness, and the authentication command line.
+2. `python -m pytest tests/runtime -q` passed (324 tests), including validation, upload-limit, retrieval-error, login/logout, token expiry/revocation, role, cross-student access, log redaction, schema migration and rollback, backup and restore, backup encryption, backup retention, backup scheduling, health and readiness, the enrollment workflow, the enrollment audit trail, the admin enrollment API, the metrics, the evaluation harness, and the authentication command line.
 3. `python -m uvicorn app.main:app` reached "Application startup complete" against a temporary database.
 4. `GET /` and `GET /docs` returned `200`; the real server issued a login token, `GET /auth/me` returned the student account, and an unauthenticated `GET /attendance/all` returned `401`.
-5. A temporary configured database was created with the `attendance`, `users`, and `auth_tokens` tables during startup; restart preserved an inserted attendance row.
+5. A temporary configured database was created with the `attendance`, `users`, `auth_tokens`, `schema_migrations`, and `enrollment_audit` tables during startup; restart preserved an inserted attendance row.
 6. The attendance API returned an empty list on a fresh database, inserted a record, and mapped a repeated insert to the duplicate response using fake model services.
 7. Authentication tests created local accounts, issued and revoked tokens, rejected expired tokens, and enforced student self-access/admin read-only behavior with a temporary database and fake model services.
 8. Startup logs showed schema initialization before MediaPipe and InsightFace loading once each.
@@ -99,12 +105,17 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 18. The deployment baseline was merged in PR #34. The harness was executed and produced the recorded numbers.
 19. The evaluation harness was merged in PR #35. The runner was verified to refuse a missing dataset and an invalid dataset with a nonzero exit code.
 20. The real biometric model assets were verified to load: MediaPipe Face Landmarker and InsightFace `buffalo_l` both initialize, with a measured startup of 1.0 s and 986 MB resident memory.
-21. CI passed on PRs #29, #30, #31, #32, #33, #34, #35, #37, #38, #39, and #40. The `Compile and test` and `Secret scan` jobs passed on every one.
+21. CI passed on PRs #29, #30, #31, #32, #33, #34, #35, #37, #38, #39, #40, #42, #43, #44, #45, and #46. The `Compile and test` and `Secret scan` jobs passed on every one.
 22. The real biometric models were verified to load and to run the actual pipeline. The MediaPipe Face Landmarker and InsightFace both initialize, the liveness path executes on a real frame, the InsightFace detector exhausts its five detection strategies on a real image, and the attendance endpoint rejects an image with no face and stores no record. The same checks run as an automated test when the assets are provisioned, and are skipped otherwise.
-22. The backup retention policy was merged in PR #37. The age limit, the count limit, the rule that the newest backup is always kept, and the guard against deleting an unrelated directory were verified.
-23. The enrollment audit trail was merged in PR #38. It was verified that no embedding value reaches the trail, that the source path is reduced to its file name, and that the enrollment outcomes are recorded.
-24. The cleanup command fix was merged in PR #39. The old behaviour was confirmed first: the command exited successfully and deleted nothing.
-25. The metrics endpoint was merged in PR #40. A request to `/attendance/student/SECRETSTUDENT42` was verified to produce the label `/attendance/student/{student_id}`, with the identifier absent from the output.
+23. The backup retention policy was merged in PR #37. The age limit, the count limit, the rule that the newest backup is always kept, and the guard against deleting an unrelated directory were verified.
+24. The enrollment audit trail was merged in PR #38. It was verified that no embedding value reaches the trail, that the source path is reduced to its file name, and that the enrollment outcomes are recorded.
+25. The cleanup command fix was merged in PR #39. The old behaviour was confirmed first: the command exited successfully and deleted nothing.
+26. The metrics endpoint was merged in PR #40. A request to `/attendance/student/SECRETSTUDENT42` was verified to produce the label `/attendance/student/{student_id}`, with the identifier absent from the output.
+27. The README accuracy pass was merged in PR #42.
+28. Encrypted backups were merged in PR #43. The plaintext was verified not to appear in the stored files, a modified ciphertext was verified to fail authentication, and restoring an encrypted backup was verified to require the passphrase.
+29. The real-model pipeline verification was merged in PR #44. It loads the provisioned models and exercises the actual rejection path; the acceptance path still needs a consented face.
+30. The admin enrollment API was merged in PR #45. Enrollment and audit reads are restricted to administrators, and refused enrollments are audited.
+31. The scheduled backup command was merged in PR #46, but its CLI handler was missing and its parser was duplicated. On `fix/backup-schedule-cli` the handler now prints the cron or systemd output, the generated command includes absolute paths, the project root, and the retention limits, and the passphrase is never emitted.
 
 ## What was not verified
 
@@ -115,7 +126,7 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 - The attendance verification path under load with real faces.
 - Webcam client behavior with a real camera.
 - The single-worker constraint under a real multi-worker deployment. The constraint is documented, not exercised.
-- TLS, rate limiting, MFA, SSO, account lockout, or audit logging.
+- TLS, rate limiting, MFA, SSO, account lockout, or comprehensive attendance audit logging. Enrollment auditing is implemented and tested.
 - Deployment, load, or adversarial security testing.
 
 ## Current blockers
@@ -123,7 +134,7 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 1. No consented evaluation dataset exists, so no liveness, face-recognition, or anti-spoofing accuracy has been measured ([#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11)). The requirements are in `docs/EVALUATION_DATASET_POLICY.md`.
 2. Branch protection is not configured on `main`. This requires a repository settings change by the owner.
 3. The attendance verification path has not been load tested with real faces.
-4. There is no consent workflow and no enrollment audit trail.
+4. There is no consent workflow. Enrollment records a consent reference, but the consent record itself is kept outside the application.
 
 ## Definition of a working next milestone
 
