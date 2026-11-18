@@ -11,13 +11,15 @@ Runtime bootstrap is implemented and was verified on one documented platform:
 | Dependency install | Clean virtual environment + `python -m pip install -r requirements.txt` |
 | Startup | `python -m uvicorn app.main:app` reached "Application startup complete" |
 | Endpoints | `GET /` returned `200`; `GET /docs` returned `200` |
-| Database startup | A temporary database was created with the `attendance`, `users`, and `auth_tokens` tables; restart preserved rows; duplicate insert was rejected |
-| Authentication | Local accounts, login/logout, token expiry/revocation, student self-access, and admin read-only access verified with temporary storage and fake model services |
+| Database startup | Versioned migrations created the `attendance`, `users`, `auth_tokens`, `schema_migrations`, and `enrollment_audit` tables; restart preserved rows; duplicate insert was rejected |
+| Authentication | Local accounts, login/logout, token expiry/revocation, student self-access, admin read-only attendance access, and admin-only enrollment verified with temporary storage and fake model services |
 | Missing model | Startup failed with a `RuntimeError` naming `MEDIAPIPE_FACE_LANDMARKER_MODEL` |
 | Model services | MediaPipe and InsightFace each initialized once during startup |
+| Automated tests | `python -m pytest tests/runtime -q` passed (324 tests) |
+| CI | Compile, test, and secret-scan jobs pass on pull requests; branch protection is not configured |
 
-This does **not** mean the whole application is verified. Tests/CI, TLS, rate
-limiting, and the end-to-end camera flow remain open. See the
+This does **not** mean the whole application is verified. TLS, rate limiting,
+and the end-to-end camera acceptance flow remain open. See the
 [tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
 ## Supported Python version
@@ -148,13 +150,13 @@ behavior are documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Database initialization
 
-The FastAPI lifespan calls `initialize_database()` and
-`initialize_auth_database()` for the configured `ATTENDANCE_DB_PATH` before
-constructing model services. They create the parent directory and the
-`attendance`, `users`, and `auth_tokens` tables if they do not exist, commit the
-schema, and set `app.state.database_initialized` and
-`app.state.auth_initialized`. Initialization is idempotent, so restarting
-against an existing database preserves rows.
+The FastAPI lifespan applies the pending schema migrations for the configured
+`ATTENDANCE_DB_PATH` before constructing model services. The migrations create
+the parent directory and the `attendance`, `users`, `auth_tokens`,
+`schema_migrations`, and `enrollment_audit` tables as needed, are transactional,
+and set `app.state.database_initialized` and `app.state.auth_initialized`.
+Initialization is idempotent, so restarting against an existing database
+preserves rows.
 
 To verify against a throwaway database:
 
@@ -171,22 +173,20 @@ attendance database.
 
 ## Manual client
 
-`test_api_attendance.py` is a manual client, not an automated test. It requires:
+`python -m manual.api_attendance` is a manual client, not an automated test. It
+requires:
 
 - the API running at `http://127.0.0.1:8000`;
 - a webcam;
 - `requests` and OpenCV;
-- a registered embedding for `STU001`;
+- a registered embedding for the chosen student identifier;
 - a provisioned student account;
 - a liveness flow completed by a person.
 
 The client prompts for the account password, obtains a bearer token from
-`POST /auth/token`, and sends it on protected requests. It reads
-`ATTENDANCE_API_URL` and `ATTENDANCE_USERNAME` from the environment (defaults:
-`http://127.0.0.1:8000` and `student1`). It still uses hardcoded values for
-`STUDENT_ID`, `SUBJECT`, and `LECTURE_ID`; review before running.
-Parameterizing the remaining values is tracked in
-[#10](https://github.com/Kartik-gharte/Attendance.Application/issues/10).
+`POST /auth/token`, and sends it on protected requests. Every value is
+configurable through command-line arguments or environment variables; see
+[Running the manual API client](#running-the-manual-api-client).
 
 ## Verification commands
 
@@ -220,13 +220,13 @@ See [TESTING.md](TESTING.md) for what is and is not covered.
 - Startup on Windows or Linux, or with any Python version other than 3.11.16.
 - A complete liveness + face-match + attendance flow with a camera and a bearer token.
 - Recognition accuracy, liveness accuracy, and presentation-attack resistance.
-- TLS, rate limiting, account lockout, MFA/SSO, and audit logging.
-- Full API/database coverage and CI beyond the focused runtime tests.
+- TLS, rate limiting, account lockout, MFA/SSO, and comprehensive attendance audit logging.
+- Live biometric storage encryption and multi-worker operation.
 
 ## Enrolling a face embedding
 
-Enrollment writes biometric data. It is a controlled local operation and is
-not exposed through the API.
+Enrollment writes biometric data. It is a controlled operation available
+through the command line and through the administrator-only API.
 
 Prerequisites:
 
