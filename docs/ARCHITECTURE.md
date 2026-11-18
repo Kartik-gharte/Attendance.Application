@@ -18,6 +18,13 @@ flowchart LR
     FR --> IF[InsightFace buffalo_l]
     FR --> EMB[(data/face_embeddings/*.npy)]
     AR --> DB
+    Admin[Administrator client] -->|Bearer token| ADM[Admin enrollment routes]
+    ADM --> ENR[Enrollment service]
+    ENR --> IF
+    ENR --> EMB
+    ADM --> DB
+    Ops[Supervisor / scraper] --> HEALTH[Health and metrics]
+    HEALTH --> DB
 ```
 
 ## Entry point
@@ -27,7 +34,8 @@ flowchart LR
 - Exposes `create_app(settings=None, service_factory=build_services)` for explicit app construction and testing.
 - Loads validated settings from `app/core/config.py`.
 - Configures CORS from `CORS_ALLOWED_ORIGINS`, with credentials enabled and all methods/headers allowed.
-- Registers the attendance, liveness, and authentication routers.
+- Registers the attendance, liveness, authentication, admin, health, and
+  metrics routers, and installs the metrics middleware.
 - Exposes `GET /`.
 - Creates the module-level `app = create_app()` used by Uvicorn.
 
@@ -58,12 +66,18 @@ requests.
 | `app/services/anti_spoofing.py` | Face-size, brightness, and Laplacian-variance screening. | Heuristic only; not a trained presentation-attack detector. |
 | `app/services/face_recognition.py` | InsightFace embedding extraction, multi-attempt detection, cosine similarity, registered-embedding loading. | Model name/cache/threshold/embedding directory come from settings; raises on missing/empty assets. |
 | `app/services/attendance_verification.py` | Combines liveness and face results into a final attendance decision. | Accepts shared service instances; standalone construction still works for manual scripts. |
-| `app/database/attendance_db.py` | SQLite connection, schema definition, insert/query helpers, duplicate detection. | Path comes from `ATTENDANCE_DB_PATH`; idempotent schema initialization runs at startup; local time without timezone; no migrations. |
+| `app/api/admin_routes.py` | Administrator-only enrollment and enrollment-audit reads. | Requires the admin role; the source image is temporary; an existing embedding is never replaced without `overwrite`. |
+| `app/database/attendance_db.py` | SQLite connection, insert/query helpers, duplicate detection, retention deletion. | Path comes from `ATTENDANCE_DB_PATH`; schema initialization delegates to the versioned migrations; local time without timezone. |
+| `app/database/migrations.py` | Versioned, ordered, transactional schema migrations. | Applied at startup and by `python -m app.database.migrations upgrade`; a failed migration rolls back. |
+| `app/database/backup.py` | Backup, verify, restore, retention, and schedule generation. | Encrypted by default; verifies before restore; writes a safety copy. |
 | `app/core/config.py` | Validated settings loaded from environment variables and `.env`. | Defaults are project-relative; model existence is checked at startup, not at config import. |
-| `app/services/register_face.py` | Manual face-registration script. | Hardcoded student ID, input filename, and relative output path; not an API. |
-| `app/services/recognize_face.py` | Manual recognition script. | Hardcoded paths and student ID; not an API. |
-| `app/services/combined_test.py` | Standalone camera test combining liveness and recognition. | Windows-specific paths; duplicates logic from services; not part of the API. |
-| `test_api_attendance.py` | Manual end-to-end API client. | Requires running server, camera, `requests`, and registered embedding. |
+| `app/core/crypto.py` | AES-256-GCM encryption and scrypt key derivation for backups. | The passphrase comes from `BACKUP_PASSPHRASE` or a prompt, never argv. |
+| `app/core/metrics.py` | In-process counters, gauges, histograms, and route-template labels. | No third-party metrics dependency; lost on restart. |
+| `app/services/register_face.py` | Parameterized enrollment service and CLI. | Validates identifiers, contains the destination, writes atomically, records an audit entry. |
+| `app/services/recognize_face.py` | Parameterized recognition CLI. | Reads the configured embedding directory; no hardcoded identifiers. |
+| `app/services/enrollment_audit.py` | Enrollment audit storage and retention. | Holds no images or embeddings, only a digest. |
+| `app/evaluation/` | Dataset validation and accuracy measurement harness. | Refuses an invalid dataset; no accuracy figure has been produced. |
+| `manual/api_attendance.py` | Manual end-to-end API client. | Requires a running server, camera, `requests`, and a registered embedding; values come from arguments or environment variables. |
 
 ## Liveness flow
 
@@ -113,17 +127,21 @@ Runtime dependencies are pinned in `requirements.txt`; development dependencies 
 
 ## Current vs future architecture
 
-**Current:** local single-process FastAPI app, local SQLite accounts and attendance, opaque bearer tokens, in-memory sessions bound to authenticated users, local model assets, manual client.
+**Current:** local single-process FastAPI app, local SQLite accounts and
+attendance, opaque bearer tokens, in-memory sessions bound to authenticated
+users, local model assets, versioned migrations, encrypted backups, health and
+metrics endpoints, an admin enrollment API, and a manual client.
 
 **Proposed future (not implemented):**
 
-- Readiness/health endpoints that report model and database state.
-- Shared session storage (for multiple workers) with expiry and one-time use.
-- SSO/institutional identity, MFA, rate limiting, account lockout, and audit logging.
-- Async or thread-safe database access and migrations.
-- Automated tests with mocked models for API and database logic.
+- Shared session storage for multiple workers, with expiry and one-time use.
+- SSO/institutional identity, MFA, rate limiting, account lockout, and an
+  attendance audit log.
+- Async or thread-safe database access.
+- Tracing and alerting.
 - A web client built against a stable API contract.
 - A trained presentation-attack detection component, subject to evaluation.
+- Live-storage encryption and key management.
 
 Do not describe any proposed item as implemented until code and tests support it.
 
@@ -171,7 +189,9 @@ that asserts no other module prints to stdout.
 
 ## Enrollment path versus API path
 
-Enrollment is deliberately kept off the request path.
+Enrollment is deliberately kept off the student request path. It is
+available through the administrator-only API and the local CLI, and both
+paths share the same service.
 
 ```
 CLI enrollment (app/services/register_face.py)
@@ -346,3 +366,14 @@ scrape always reports the current state rather than a cached one.
 The metrics live in process memory and are lost on restart. With more
 than one worker each worker keeps its own counters, which is one more
 reason the service is documented to run a single worker.
+
+## Backup scheduling
+
+`python -m app.database.backup schedule cron|systemd` generates configuration;
+it does not install anything and does not create a backup. The generated
+command invokes the normal `create` path with absolute paths, the configured
+encryption setting, and the resolved retention limits. The output never
+contains the passphrase. Cron runs the command from the project root with the
+current interpreter; the systemd service sets `WorkingDirectory` and
+`PYTHONPATH` and optionally reads `/etc/attendance/backup.env`. The operator
+installs the generated entry or units.

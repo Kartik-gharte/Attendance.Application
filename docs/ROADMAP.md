@@ -6,7 +6,7 @@ Build a trustworthy attendance-verification backend in small, reviewable increme
 
 This roadmap is a proposal. It does not promise dates and does not mean any listed item is implemented.
 
-## Phase 0 — Project foundation (merge complete; CI expectations pending)
+## Phase 0 — Project foundation (complete; branch protection pending)
 
 **Goal:** make the repository understandable and governable before changing runtime behavior.
 
@@ -20,7 +20,7 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 **Exit criteria:** documentation matches the code, links and claims are reviewed, and the changes are merged without altering runtime behavior.
 
-## Phase 1 — Runtime bootstrap (in progress)
+## Phase 1 — Runtime bootstrap (complete except consented end-to-end flow)
 
 **Goal:** make a fresh clone start predictably.
 
@@ -57,9 +57,9 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 - [x] Bind liveness sessions to an authenticated user, and deny cross-student session use.
 - [ ] Remove session IDs from query strings and add device/replay protection.
 - [x] Add upload size/type limits and strict input validation ([#5](https://github.com/Kartik-gharte/Attendance.Application/issues/5)).
-- Protect or encrypt biometric storage; define retention and deletion.
+- Encrypt or otherwise protect live biometric storage; retention and deletion are implemented.
 - [x] Sanitize attendance and retrieval error responses.
-- Add rate limiting, account lockout, and audit logging.
+- Add rate limiting, account lockout, and comprehensive audit logging. Enrollment auditing is implemented.
 - Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
 
 **Exit criteria:** all sensitive endpoints require authorization, documented threat-model controls are tested, and privacy handling is reviewed.
@@ -71,7 +71,8 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 - [x] Add schema migrations and backup/restore procedures ([#12](https://github.com/Kartik-gharte/Attendance.Application/issues/12)).
 - [x] Add health/readiness checks and deployment configuration ([#12](https://github.com/Kartik-gharte/Attendance.Application/issues/12)).
 - [x] Document the single-worker constraint, the measured baseline, and the runbook in [DEPLOYMENT.md](DEPLOYMENT.md).
-- [ ] Define monitoring, audit logging, incident response, and data-retention operations.
+- [x] Add encrypted backups, retention, and generated backup schedules.
+- [ ] Define monitoring, tracing, alerting, incident response, and data-retention operations.
 - [ ] Complete an institutional privacy/legal review for the target jurisdiction.
 - [ ] Load-test the attendance verification path with real model assets and record the limits.
 
@@ -81,7 +82,7 @@ This roadmap is a proposal. It does not promise dates and does not mean any list
 
 **Goal:** improve usability only after the security and testing foundations are solid.
 
-- Add a proper enrollment/registration workflow.
+- [x] Add an administrator-only enrollment API with an audit trail.
 - Add reporting and export with access controls.
 - Build a frontend or documented API client.
 - Consider multi-class, multi-tenant, or integration requirements through separate design work.

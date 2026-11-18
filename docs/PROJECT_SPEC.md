@@ -18,15 +18,20 @@ The project is an academic/experimental system. It is not a production attendanc
 - SQLite attendance records and duplicate prevention.
 - Attendance retrieval by student and for all records.
 - Local student/admin accounts, opaque bearer tokens, and role-based access.
+- Administrator-only enrollment through the API and the CLI, with an audit trail.
+- Versioned schema migrations.
+- Encrypted backup and restore, retention, and generated backup schedules.
+- Structured, redacted logging; health, readiness, and metrics endpoints.
 - Manual scripts for registration, recognition, liveness, and API testing.
 
 ### Explicitly out of scope for the current baseline
 
 - Institutional SSO, MFA, self-service registration, and password recovery.
-- Rate limiting, account lockout, and comprehensive audit logging.
+- Rate limiting and account lockout.
+- Comprehensive attendance audit logging.
 - A web or mobile client.
 - Attendance reports, dashboards, or analytics.
-- Production deployment, monitoring, and ERP integration.
+- Production deployment, tracing, alerting, and ERP integration.
 - A trained or certified face presentation-attack detection model.
 - Guaranteed recognition accuracy or performance.
 
@@ -35,7 +40,7 @@ The project is an academic/experimental system. It is not a production attendanc
 | User | Current reality | Intended future role |
 | --- | --- | --- |
 | Student | Local account linked to one `student_id`; can start liveness sessions and mark/read only their own attendance. No UI. | Verify their own attendance through a client. |
-| Faculty/administrator | Local admin account; can read any student's attendance and all records, but cannot mark attendance. No UI. | Manage lectures and review attendance; finer-grained faculty scoping is future work. |
+| Faculty/administrator | Local admin account; can read any student's attendance and all records, and can enroll students and read the enrollment audit trail, but cannot mark attendance. No UI. | Manage lectures and review attendance; finer-grained faculty scoping is future work. |
 | Developer/researcher | Provisions accounts with the CLI, runs the API, and maintains manual scripts locally. | Maintain and extend the system. |
 
 Accounts are stored locally in SQLite. There is no public signup or institutional identity provider. The authenticated student's account determines which `student_id` can be marked and read.
@@ -51,41 +56,41 @@ Status labels:
 
 | ID | Requirement | Status | Evidence / notes |
 | --- | --- | --- | --- |
-| FR-01 | Create a liveness session | Implemented (runtime unverified) | `POST /liveness/start`; in-memory UUID session in `app/api/liveness_routes.py`. |
-| FR-02 | Process webcam frames for a session | Implemented (runtime unverified) | `POST /liveness/frame`; multipart image plus `session_id` query parameter. |
-| FR-03 | Detect a face and facial landmarks | Implemented (runtime unverified) | MediaPipe Face Landmarker in `app/services/liveness.py`; requires a model file. |
-| FR-04 | Detect a blink | Implemented (runtime unverified) | Eye Aspect Ratio with `CLOSED_THRESHOLD = 0.10` and `REQUIRED_CLOSED_FRAMES = 4`. |
+| FR-01 | Create a liveness session | Implemented | `POST /liveness/start`; in-memory UUID session bound to the authenticated user in `app/api/liveness_routes.py`. |
+| FR-02 | Process webcam frames for a session | Implemented | `POST /liveness/frame`; multipart image plus `session_id` query parameter. Covered by runtime tests and the real-model rejection path. |
+| FR-03 | Detect a face and facial landmarks | Implemented | MediaPipe Face Landmarker in `app/services/liveness.py`; the provisioned model is exercised by the real-model pipeline test. |
+| FR-04 | Detect a blink | Implemented | Eye Aspect Ratio with `CLOSED_THRESHOLD = 0.10` and `REQUIRED_CLOSED_FRAMES = 4`; covered by runtime tests. |
 | FR-05 | Apply image-quality screening | Partially implemented | Face-size, brightness, and Laplacian-variance checks in `anti_spoofing.py`. No trained PAD model. |
 | FR-06 | Prevent simple static-image attacks | Partially implemented | Blink interaction plus heuristic screening. Not a certified or robust defense. |
-| FR-07 | Extract a face embedding | Implemented (runtime unverified) | InsightFace `buffalo_l` in `face_recognition.py`. |
-| FR-08 | Compare embeddings | Implemented (runtime unverified) | Cosine similarity with a configurable threshold (default `0.40`). |
-| FR-09 | Verify attendance from liveness + face match | Implemented (runtime unverified) | `POST /attendance/verify`; rejects unless liveness session and face match are valid. |
-| FR-10 | Persist attendance in SQLite | Implemented (startup and persistence verified without models) | Startup creates the schema idempotently; inserts, retrieval, and duplicate rejection are covered by focused tests. End-to-end API verification with real models is still outstanding. |
-| FR-11 | Prevent duplicate attendance | Implemented (runtime unverified) | `UNIQUE (student_id, lecture_id, attendance_date)` plus `sqlite3.IntegrityError` handling. |
-| FR-12 | Retrieve attendance | Implemented (runtime unverified) | `GET /attendance/student/{student_id}` and `GET /attendance/all`. |
-| FR-13 | Expire and consume liveness sessions | Implemented (runtime unverified) | Configurable validity (default 30 seconds); session removed after rejection, success, or expiry. |
-| FR-14 | Register a student's face | Partially implemented | `app/services/register_face.py` is a manual script with hardcoded `STU001`, `test.jpg`, and a relative output path. Not exposed through the API. |
+| FR-07 | Extract a face embedding | Implemented | InsightFace `buffalo_l` in `face_recognition.py`; the provisioned model is exercised by the real-model pipeline test. |
+| FR-08 | Compare embeddings | Implemented | Cosine similarity with a configurable threshold (default `0.40`); covered by runtime tests. |
+| FR-09 | Verify attendance from liveness + face match | Implemented | `POST /attendance/verify`; rejects unless the liveness session and face match are valid. The rejection path is verified with real models; the acceptance path needs a consented face. |
+| FR-10 | Persist attendance in SQLite | Implemented | Versioned migrations create the schema; inserts, retrieval, duplicate rejection, and restart persistence are covered by tests. |
+| FR-11 | Prevent duplicate attendance | Implemented | `UNIQUE (student_id, lecture_id, attendance_date)` plus `sqlite3.IntegrityError` handling; covered by tests. |
+| FR-12 | Retrieve attendance | Implemented | `GET /attendance/student/{student_id}` and `GET /attendance/all`, with role and ownership checks. |
+| FR-13 | Expire and consume liveness sessions | Implemented | Configurable validity (default 30 seconds); session removed after rejection, success, or expiry. |
+| FR-14 | Register a student's face | Implemented | Shared enrollment service with `python -m app.services.register_face` and administrator-only `POST /admin/enrollments`; validated identifiers, overwrite protection, atomic writes, and an audit trail. |
 | FR-15 | Authenticate users | Implemented (verified with temporary storage and fake services) | Local accounts with Argon2id password hashes and opaque bearer tokens in `app/auth/`; CLI provisioning. Real deployment, TLS, and identity-provider integration remain unverified. |
-| FR-16 | Authorize attendance access | Implemented (verified with temporary storage and fake services) | Students can mark/read only their own attendance; admins can read all records but cannot mark attendance. Liveness sessions are bound to the authenticated user. |
-| FR-17 | Provide a web client | Planned | The only client is the manual `test_api_attendance.py`; it now authenticates but still uses hardcoded student/subject/lecture values. |
-| FR-18 | Automated test suite | Partially implemented | Focused runtime tests exist (45 tests); the broader suite and CI remain open in [#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7). |
+| FR-16 | Authorize attendance access | Implemented (verified with temporary storage and fake services) | Students can mark/read only their own attendance; admins can read all records and manage enrollment but cannot mark attendance. Liveness sessions are bound to the authenticated user. |
+| FR-17 | Provide a web client | Planned | The only client is the manual `manual/api_attendance.py`; it reads its student, subject, and lecture from arguments or environment variables. There is no web UI. |
+| FR-18 | Automated test suite | Implemented | 324 runtime tests run in CI on every pull request, covering settings, startup, database, API, authentication, authorization, migrations, backup and restore, scheduling, enrollment, metrics, and the evaluation and benchmark harnesses. |
 | FR-19 | Reports and dashboards | Planned | No reporting endpoints or UI. |
-| FR-20 | Database migrations | Planned | No migration tooling or versioned schema. |
+| FR-20 | Database migrations | Implemented | Versioned, transactional migrations with rollback on failure and a readiness check on the schema version. Downgrade is not implemented. |
 
 ## Non-functional requirements
 
 | Area | Current state |
 | --- | --- |
-| Security | Local-account authentication, opaque bearer tokens, and role-based attendance authorization are implemented. Heuristic anti-spoofing only. TLS, rate limiting, MFA, and audit logging are not implemented. |
-| Privacy | Face embeddings, account data, and attendance databases are local and gitignored. No retention/deletion policy or consent workflow. |
+| Security | Local-account authentication, opaque bearer tokens, role-based authorization, administrator-only enrollment, and redacted logging are implemented. Heuristic anti-spoofing only. TLS, rate limiting, MFA, account lockout, and comprehensive attendance audit logging are not implemented. |
+| Privacy | Face embeddings, account data, and attendance databases are local and gitignored. Attendance and enrollment-audit retention, encrypted backups, and a consent reference are implemented; live biometric storage is unencrypted and there is no consent workflow. |
 | Portability | Startup verified on macOS arm64. The MediaPipe path, embedding directory, database path, CORS origins, and InsightFace cache are configurable. Windows/Linux are unverified. |
 | Reproducibility | Runtime and development dependencies are pinned; a clean Python 3.11.16 virtual environment installed successfully. |
-| Persistence | A fresh configured database is initialized at startup; restart preserves rows; duplicate insertion is rejected. |
-| Performance | Unverified. Models load once during lifespan startup; SQLite calls are synchronous inside async routes. |
-| Accuracy | Unverified. No benchmark, dataset, false-accept/false-reject measurements, or calibration. |
-| Observability | `print()` statements only; no structured logging, metrics, or tracing. |
-| Reliability | In-memory sessions are single-process only; no retry, timeout, or concurrency handling. |
-| Maintainability | Shared lifespan-managed services and focused runtime tests exist; manual camera scripts and the missing CI/test baseline remain. |
+| Persistence | A fresh configured database is initialized through versioned migrations at startup; restart preserves rows; duplicate insertion is rejected. |
+| Performance | A measured baseline exists for the current environment; load testing with real faces has not been performed. Models load once during lifespan startup; SQLite calls are synchronous inside async routes. |
+| Accuracy | Unverified. No consented dataset, false-accept/false-reject measurements, or calibration; the evaluation harness is implemented. |
+| Observability | Structured, leveled, redacted logging plus health, readiness, and Prometheus metrics endpoints. No tracing or alerting. |
+| Reliability | In-memory sessions are single-process only; expired and consumed sessions are removed, but abandoned sessions are not swept in the background. No retry, timeout, or concurrency handling. |
+| Maintainability | Shared lifespan-managed services, 324 runtime tests, and CI on every pull request; manual camera scripts remain. |
 
 ## Constraints and assumptions
 

@@ -140,13 +140,16 @@ The route maps a duplicate result to `status: "duplicate"` and `attendance_statu
 - Have no pagination or filtering.
 - Are protected at the API layer: students can read only their own records; admins can read any student's records and the full list. The database helpers themselves do not enforce access control.
 
-## Duplicate helper
+## Duplicate protection
 
-`attendance_already_marked(student_id, lecture_id, attendance_date)` performs a pre-check query, but no route calls it. Duplicate protection currently relies on the database constraint and `IntegrityError` handling.
+There is no separate pre-check helper. Duplicate protection relies on the
+`UNIQUE (student_id, lecture_id, attendance_date)` constraint and on
+`sqlite3.IntegrityError` handling in `mark_attendance()`.
 
 ## Migrations
 
-There is no migration framework, schema version table, or upgrade path. The schema is created by the idempotent `initialize_database()` startup path. Any future schema change needs a documented migration strategy and a decision record.
+The schema is versioned; see [Schema versioning and migrations](#schema-versioning-and-migrations)
+below.
 
 ## Time handling
 
@@ -381,9 +384,57 @@ python -m app.database.backup prune --dry-run
 python -m app.database.backup prune
 ```
 
-### Recommended schedule
+### Scheduling backups
 
-The project does not schedule backups automatically. A minimal schedule:
+The project does not install a schedule itself; it generates one so that
+the command, the paths, and the retention limits match the current
+configuration. The schedule runs the same `create` command, so pruning
+still happens after each backup.
+
+For a user crontab, print a daily entry (02:00 by default) and add it to
+the crontab:
+
+```bash
+python -m app.database.backup schedule cron
+```
+
+The entry changes to the project directory, uses the interpreter that ran
+the command, and passes absolute paths. When encryption is enabled, the
+cron environment must provide `BACKUP_PASSPHRASE`; an encrypted backup
+fails loudly without it, rather than writing a plaintext copy.
+
+For systemd, print a service and timer definition:
+
+```bash
+python -m app.database.backup schedule systemd
+```
+
+Save the service block as `attendance-backup.service` and the timer block
+as `attendance-backup.timer` (the blocks are marked in the output), place
+them in the systemd unit directory, then enable the timer:
+
+```bash
+systemctl daemon-reload
+systemctl enable --now attendance-backup.timer
+```
+
+The generated service reads `BACKUP_PASSPHRASE` from
+`/etc/attendance/backup.env` when that file exists. The passphrase is never
+written into the generated output. Set the file permissions to `0600`.
+
+Options that affect the generated output:
+
+| Option | Meaning |
+| --- | --- |
+| `--database-path` | Database to back up. |
+| `--embedding-dir` | Embedding directory to back up. |
+| `--backup-dir` | Backup directory. Defaults to `backups` next to the database. |
+| `--retention-days` | Age limit embedded in the generated command. |
+| `--max-count` | Count limit embedded in the generated command. |
+| `--no-embeddings` | Exclude the face embeddings. |
+| `--no-encryption` | Generate a schedule for an unencrypted backup. |
+
+### Recommended maintenance schedule
 
 - before every schema migration;
 - daily, while the service is in use;

@@ -2,11 +2,11 @@
 
 ## Current status
 
-Focused runtime tests exist under `tests/runtime/`. They cover settings validation, path resolution, the missing-model error, lifespan service wiring with a fake service factory, database initialization, configured database paths, attendance retrieval, duplicate handling, identifier validation, upload limits, controlled error responses, local account provisioning, Argon2id password verification, bearer-token expiry/revocation, login/logout, role checks, cross-student denial, and liveness-session ownership using temporary databases and fake model services. They do not load real models or open a camera.
+Focused runtime tests exist under `tests/runtime/`. They cover settings validation, path resolution, the missing-model error, lifespan service wiring with a fake service factory, database initialization, configured database paths, attendance retrieval, duplicate handling, identifier validation, upload limits, controlled error responses, local account provisioning, Argon2id password verification, bearer-token expiry/revocation, login/logout, role checks, cross-student denial, liveness-session ownership, schema migrations, backup and restore, backup encryption and retention, backup schedule generation, enrollment and its audit trail, the admin enrollment API, log redaction, metrics, and the evaluation and benchmark harnesses using temporary paths and fake model services. They do not load real models or open a camera by default; the opt-in real-model test is described below.
 
 The older files named `test_*.py` are still manual scripts that execute top-level code when imported or run. Do not run plain `pytest` against the whole `tests/` directory: collection imports those modules, which can load models, open a camera, exit the process, or require missing fixtures.
 
-Runtime verification of the real liveness and face-recognition camera flow was **not performed**. SQLite schema initialization, retrieval, duplicate handling, input validation, upload limits, controlled error responses, authentication, token lifecycle, and authorization were verified through focused runtime tests without loading real models.
+Runtime verification of the real camera acceptance flow was **not performed**. The real MediaPipe and InsightFace assets have been loaded and exercised on the rejection path; a successful match needs a consented face. SQLite schema initialization, retrieval, duplicate handling, input validation, upload limits, controlled error responses, authentication, token lifecycle, authorization, migrations, backups, scheduling, and enrollment were verified through focused runtime tests without loading real models.
 
 ## What was verified
 
@@ -15,7 +15,7 @@ On macOS 27.0.1 arm64 with Python 3.11.16:
 | Check | Result | Scope |
 | --- | --- | --- |
 | `python -m compileall -q app tests` | Passed | Syntax/bytecode compilation only. |
-| `python -m pytest tests/runtime -q` | Passed (45 tests) | Settings, lifespan wiring, `/`, `/docs`, missing-model failure, database initialization, retrieval, duplicate handling, validation, upload limits, controlled errors, authentication, token lifecycle, and authorization. |
+| `python -m pytest tests/runtime -q` | Passed (324 tests) | Settings, lifespan wiring, `/`, `/docs`, missing-model failure, database initialization, migrations, retrieval, duplicate handling, validation, upload limits, controlled errors, authentication, token lifecycle, authorization, logging and redaction, backup and restore, backup encryption and retention, backup scheduling, enrollment and audit, admin enrollment, metrics, and the evaluation and benchmark harnesses. |
 | Attendance API with temporary database and fake model services | Passed | Fresh retrieval returns an empty list; repeated insert maps to duplicate response; unauthenticated requests return `401`; cross-student and wrong-role requests return `403`. |
 | Authentication API with temporary database | Passed | Login, `/auth/me`, logout revocation, expired-token rejection, student self-access, admin read-only access, and session ownership checks. |
 | `python -m uvicorn app.main:app` | Startup complete | Real MediaPipe and InsightFace models loaded once each. |
@@ -30,7 +30,7 @@ The following scripts are **not** collected by `pytest` (they are outside `tests
 
 | Script | What it does | Requirements | Current state |
 | --- | --- | --- | --- |
-| `manual/api_attendance.py` | Authenticates, starts a liveness session, opens a webcam, sends frames, waits for a blink, then submits the final frame to `/attendance/verify`. | Running API, provisioned student account, webcam, `requests`, OpenCV, registered embedding for `STU001`. | Manual, no assertions; prompts for a password; hardcoded student/subject/lecture; reads `ATTENDANCE_API_URL` and `ATTENDANCE_USERNAME`. |
+| `manual/api_attendance.py` | Authenticates, starts a liveness session, opens a webcam, sends frames, waits for a blink, then submits the final frame to `/attendance/verify`. | Running API, provisioned student account, webcam, `requests`, OpenCV, and a registered embedding. | Manual, no assertions; prompts for a password; parameters and environment variables are documented by `--help`. |
 | `manual/liveness_service.py` | Older liveness camera script. | Webcam, MediaPipe model. | Broken import: `from app.services.liveness import LivenessService`; not runnable as‑is without `PYTHONPATH=.`. |
 | `manual/attendance_verification.py` | Full camera liveness + face‑recognition flow. | Webcam, MediaPipe + InsightFace models, embedding for `STU001`. | Manual; no assertions. |
 | `manual/embedding.py` | Extracts an InsightFace embedding from a fixture image. | `manual/fixtures/test.jpg` (or provide `INSIGHTFACE_ROOT`), InsightFace model. | Fixture absent; manual. |
@@ -74,7 +74,6 @@ Branch protection is **not configured** because the current collaborator account
 7. Save the rule.
 
 Until that rule exists, CI results are advisory rather than enforced by GitHub.
-| `app/services/recognize_face.py` | Compares `test.jpg` with a registered embedding. | InsightFace model, `test.jpg`, embedding. | Hardcoded paths. |
 
 ## Why the scripts are not automated tests
 
@@ -98,39 +97,18 @@ git diff --check
 
 They verify syntax, focused runtime behavior, and diff hygiene. They do not prove the camera-based flows.
 
-## CI
-
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on pull requests and pushes to `main`:
-
-- **Compile and test**: installs pinned dependencies, runs `python -m compileall -q app tests`, and runs `python -m pytest tests/runtime -q`.
-- **Secret scan**: runs `gitleaks/gitleaks-action` with full Git history.
-
-CI does not download model assets, open a camera, or run the manual scripts. A passing run proves only the checks listed above. Both jobs passed on PR #22: `Compile and test` in 56 seconds and `Secret scan` in 7 seconds.
-
-Branch protection is **not configured** because the current collaborator account does not have repository admin permission. The repository owner must apply these settings:
-
-1. Open **Settings → Branches → Add branch protection rule**.
-2. Set the branch name pattern to `main`.
-3. Enable **Require a pull request before merging**.
-4. Enable **Require status checks to pass before merging** and select `Compile and test` and `Secret scan`.
-5. Enable **Require branches to be up to date before merging**.
-6. Disable force pushes and branch deletion.
-7. Save the rule.
-
-Until that rule exists, CI results are advisory rather than enforced by GitHub.
-
 ## Future automated test plan
 
-Proposed for Phase 2 of the [roadmap](ROADMAP.md):
+The original Phase 2 items are complete:
 
-1. Unit tests for `compare_faces`, EAR calculation, and anti-spoofing heuristics using synthetic arrays.
-2. Broaden database tests to additional insert, duplicate, and query cases.
-3. Expand API tests with mocked model services to cover liveness rejection and the full session state machine.
-4. Liveness state-machine tests using synthetic frames or mocked detectors.
-5. Face-matching tests with synthetic or explicitly consented fixtures; never real student data.
-6. CI workflow that runs tests without a camera or model downloads.
+1. [x] Unit tests for `compare_faces`, EAR calculation, and anti-spoofing heuristics using synthetic arrays.
+2. [x] Database insert, duplicate, query, migration, backup, and restore coverage.
+3. [x] API tests with mocked model services for liveness rejection and the session state machine.
+4. [x] Liveness state-machine tests using synthetic frames or mocked detectors.
+5. [x] Real-model rejection-path coverage, skipped when assets are absent. Face matching with consented fixtures remains blocked on the dataset ([#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11)).
+6. [x] CI workflow that runs tests without a camera or model downloads.
 
-Temporary-database and fake-model-service API/database/auth coverage now exists, including validation and upload rejection cases, but broad coverage and CI are still outstanding ([#7](https://github.com/Kartik-gharte/Attendance.Application/issues/7)).
+Remaining test work is an accuracy evaluation with a consented dataset, a load test with real faces, and multi-worker coverage after a shared session store exists.
 
 ## Hardware and test-data requirements
 

@@ -5,7 +5,7 @@ This document describes the endpoints implemented in the current code. FastAPI's
 ## General behavior
 
 - Base URL in local examples: `http://127.0.0.1:8000`.
-- `GET /`, `POST /auth/token`, `/docs`, and `/redoc` are public. Every other endpoint requires an `Authorization: Bearer <token>` header.
+- `GET /`, `POST /auth/token`, `GET /health/live`, `GET /health/ready`, `GET /metrics`, `/docs`, and `/redoc` are public. Every other endpoint requires an `Authorization: Bearer <token>` header.
 - Obtain a token from `POST /auth/token`, then send it as `Authorization: Bearer <access_token>`.
 - Tokens are opaque, stored as SHA-256 hashes, and expire after `AUTH_TOKEN_TTL_SECONDS` (default 3600 seconds). `POST /auth/logout`, a password reset, or account deactivation revokes tokens.
 - Roles are `student` and `admin`. Students may use liveness and mark/read only their own attendance. Admins may read attendance records but cannot start liveness sessions or mark attendance.
@@ -31,6 +31,11 @@ This document describes the endpoints implemented in the current code. FastAPI's
 | POST | `/attendance/verify` | Verify liveness + face and mark attendance | Bearer, student; `student_id` must match |
 | GET | `/attendance/student/{student_id}` | List a student's attendance | Bearer, student self or admin |
 | GET | `/attendance/all` | List all attendance records | Bearer, admin |
+| POST | `/admin/enrollments` | Enroll a face embedding | Bearer, admin |
+| GET | `/admin/enrollments` | Read the enrollment audit trail | Bearer, admin |
+| GET | `/health/live` | Liveness probe | Public |
+| GET | `/health/ready` | Readiness probe | Public |
+| GET | `/metrics` | Prometheus text metrics | Public |
 
 ---
 
@@ -58,6 +63,11 @@ There is no public signup. Accounts are provisioned locally with `python -m app.
 | `POST /attendance/verify` | `401` | Own `student_id` and own session only | `403` |
 | `GET /attendance/student/{student_id}` | `401` | Own records only | Any student |
 | `GET /attendance/all` | `401` | `403` | Allowed |
+| `POST /admin/enrollments` | `401` | `403` | Allowed |
+| `GET /admin/enrollments` | `401` | `403` | Allowed |
+| `GET /health/live` | Allowed | Allowed | Allowed |
+| `GET /health/ready` | Allowed | Allowed | Allowed |
+| `GET /metrics` | Allowed | Allowed | Allowed |
 
 ---
 
@@ -456,7 +466,7 @@ Returns all attendance records, newest first by date and time.
 
 ## Security notes
 
-- Authentication is required for every endpoint except `GET /`, `POST /auth/token`, and the OpenAPI documentation.
+- Authentication is required for every endpoint except `GET /`, `POST /auth/token`, `GET /health/live`, `GET /health/ready`, `GET /metrics`, and the OpenAPI documentation.
 - Passwords are stored as Argon2id hashes. Bearer tokens are stored as SHA-256 hashes with an expiry; plaintext tokens are never stored by the server.
 - Liveness sessions are bound to the authenticated user ID but remain in process memory. `session_id` is still sent as a query parameter and behaves like a short-lived capability; do not log it.
 - HTTPS, rate limiting, account lockout, token-theft detection, and comprehensive audit logging are not implemented. Do not use bearer tokens over plaintext networks.

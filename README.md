@@ -12,7 +12,7 @@
 </p>
 
 > [!WARNING]
-> **Active development — not production-ready.** Runtime bootstrap (pinned dependencies, configuration, portable model paths, lifespan-managed services), input validation, upload limits, stable error responses, local-account authentication with bearer tokens and role-based attendance authorization, structured redacted logging, versioned schema migrations, backup and restore, health and readiness probes, and a metrics endpoint are implemented and verified on macOS arm64 with Python 3.11. TLS, rate limiting, MFA/SSO, backup encryption, and a measured face-recognition accuracy remain open. Track stabilization in [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
+> **Active development — not production-ready.** Runtime bootstrap (pinned dependencies, configuration, portable model paths, lifespan-managed services), input validation, upload limits, stable error responses, local-account authentication with bearer tokens and role-based attendance authorization, structured redacted logging, versioned schema migrations, encrypted backup and restore with retention and a generated schedule, an admin enrollment API, health and readiness probes, and a metrics endpoint are implemented and verified on macOS arm64 with Python 3.11. TLS, rate limiting, MFA/SSO, tracing and alerting, and a measured face-recognition accuracy remain open. Track stabilization in [#13](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
 ## What it does
 
@@ -52,6 +52,8 @@ Liveness sessions are process-local: they disappear on restart and are not share
 | `POST` | `/attendance/verify` | Verify liveness + face and attempt to mark attendance | Bearer, student; matching `student_id` |
 | `GET` | `/attendance/student/{student_id}` | List a student's attendance records | Bearer, student self or admin |
 | `GET` | `/attendance/all` | List all attendance records | Bearer, admin |
+| `POST` | `/admin/enrollments` | Enroll a student's face with an operator and consent reference | Bearer, admin |
+| `GET` | `/admin/enrollments` | Read the enrollment audit trail | Bearer, admin |
 | `GET` | `/health/live` | Liveness probe; restart the process if it fails | Public |
 | `GET` | `/health/ready` | Readiness probe; drain the instance if it fails | Public |
 | `GET` | `/metrics` | Operational metrics in the Prometheus text format | Public |
@@ -70,6 +72,7 @@ The three public operational endpoints expose status only. The metric route labe
 | Vision | OpenCV, MediaPipe, InsightFace, ONNX Runtime |
 | Numerics | NumPy |
 | Persistence | SQLite (Python standard library) |
+| Backup encryption | AES-256-GCM and scrypt from `cryptography` |
 | Observability | Standard library `logging` with a redaction filter, Prometheus text metrics |
 | Manual client | OpenCV webcam capture, `requests` |
 
@@ -84,15 +87,15 @@ The runtime, the API surface, the authentication and authorization controls, the
 | Pinned dependencies, validated settings, `.env` support | End-to-end liveness → face match → attendance flow with a consented face |
 | Startup, `GET /`, `GET /docs`, database initialization, missing-model failure | TLS, rate limiting, account lockout, MFA/SSO |
 | One MediaPipe and one InsightFace load per process | Measured face-recognition accuracy and presentation-attack resistance ([#11](https://github.com/Kartik-gharte/Attendance.Application/issues/11)) |
-| Local login/logout, token expiry/revocation, student self-access, admin read-only access | Backup encryption at rest, an automatic backup schedule |
-| Structured redacted logging; no credential, session identifier, or embedding reaches a log | Enforced branch protection on `main` |
-| Versioned schema migrations, with rollback on a failed migration | An audit trail for attendance reads and writes |
-| Backup and restore with a checksummed manifest and a verified restore | Tracing and alerting |
-| Health and readiness probes; a dependency failure does not report the process dead | A multi-worker deployment with a shared liveness session store |
+| Local login/logout, token expiry/revocation, student self-access, admin read-only access | Enforced branch protection on `main` |
+| Structured redacted logging; no credential, session identifier, or embedding reaches a log | An audit trail for attendance reads and writes |
+| Versioned schema migrations, with rollback on a failed migration | Tracing and alerting |
+| Encrypted backup and restore with a checksummed manifest, retention, and a generated cron/systemd schedule | A multi-worker deployment with a shared liveness session store |
+| Health and readiness probes; a dependency failure does not report the process dead | |
 | Metrics with route labels that cannot contain personal data | |
-| Enrollment audit trail and a consent reference | |
+| Admin enrollment API with an audit trail and a consent reference | |
 | Attendance retention and deletion, applied to the records and the audit trail | |
-| 258 runtime tests and CI compile, test, and secret-scan checks on every pull request | |
+| 324 runtime tests and CI compile, test, and secret-scan checks on every pull request | |
 
 No benchmarked face-recognition accuracy, liveness performance, or presentation-attack resistance results exist. The evaluation machinery is built and tested, but no consented dataset is available, so no measurement has been made. Stabilization work is sequenced in the [tracking backlog](https://github.com/Kartik-gharte/Attendance.Application/issues/13).
 
@@ -126,7 +129,7 @@ Attendance.Application/
 ├── docs/                 # setup, architecture, API, security, deployment, status
 ├── manual/               # opt-in camera and API client scripts
 ├── models/               # MediaPipe model assets (not committed)
-├── tests/runtime/        # 258 deterministic tests
+├── tests/runtime/        # 324 deterministic tests
 ├── requirements.txt      # pinned runtime dependencies
 └── README.md
 ```
@@ -141,7 +144,8 @@ Attendance.Application/
 - Anti-spoofing is heuristic blink and image-quality screening, not a trained or certified presentation-attack detection system. Its effectiveness has not been measured.
 - Liveness sessions live in process memory, are single-worker only, expire `LIVENESS_VALIDITY_SECONDS` after creation (default 30 seconds), and are consumed by the first attendance attempt.
 - Biometric retention and deletion are implemented and cover the attendance records, the enrollment audit trail, and the backups.
-- Every enrollment is recorded with the operator and a consent reference. The audit trail holds no image, embedding, or face crop.
+- Backups are encrypted by default with a passphrase-derived key, verified before restore, and pruned by age and count. `python -m app.database.backup schedule` generates a daily cron entry or systemd units; the passphrase is never included in the output.
+- Enrollment is restricted to administrators and recorded with the operator and a consent reference. The audit trail holds no image, embedding, or face crop.
 - Face images, embeddings, model files, and local databases are excluded from Git. Never force-add them.
 
 Read [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md) before handling biometric data.

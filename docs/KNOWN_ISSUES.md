@@ -1,6 +1,6 @@
 # Known Issues
 
-These are confirmed gaps based on source inspection and repository state as of 2026-10-31. KI-001, KI-002, KI-003, KI-004, KI-005, KI-007, KI-009, KI-010, and KI-013 are resolved; KI-006 is partially resolved; the remaining issues are still open.
+These are confirmed gaps based on source inspection and repository state as of 2026-11-18. KI-001, KI-002, KI-003, KI-004, KI-005, KI-007, KI-008, KI-009, KI-010, KI-013, KI-014, KI-015, KI-016, KI-017, and KI-019 are resolved; KI-006, KI-011, KI-012, KI-018, and KI-020 are partially resolved.
 
 Severity is a triage aid, not a formal risk rating.
 
@@ -18,8 +18,8 @@ Severity is a triage aid, not a formal risk rating.
 | KI-008 | High | No automated test suite | Resolved (19 deterministic service tests + CI workflow merged) |
 | KI-009 | High | No configuration system | Resolved |
 | KI-010 | High | Error responses expose internal messages | Resolved |
-| KI-011 | High | No retention, deletion, encryption, or backup policy | Partially resolved (delete_old_attendance function implemented) |
-| KI-012 | Medium | In-memory sessions are per-process and never cleaned up | **Resolved** (PR #26). Sessions are now removed on expiry and after consumption, preventing unbounded growth. Single-process constraint documented. |
+| KI-011 | High | No retention, deletion, encryption, or backup policy | **Partially resolved.** Retention and deletion commands, encrypted backups, backup retention, and a schedule generator are implemented. Live biometric storage is still unencrypted. |
+| KI-012 | Medium | In-memory sessions are per-process and never cleaned up | **Partially resolved.** Sessions are removed on expiry and after consumption, but there is no background sweep for abandoned sessions. Single-process constraint documented. |
 | KI-013 | Medium | Models are loaded twice at import; startup is slow and fragile | Resolved |
 | KI-014 | Medium | Broken import in `test_liveness_service.py` | **Resolved** (root scripts moved to `manual/` in PR #23; the duplicate broken module was removed and no broken import remains in the collected test suite) |
 | KI-015 | Medium | Missing fixtures and model assets | Resolved (tests use synthetic fixtures, no model/assets required) |
@@ -109,17 +109,17 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-011 — No retention, deletion, encryption, or backup policy
 
-- **Evidence:** Embeddings and SQLite records are stored unencrypted; no deletion/retention code or documentation existed. 19 deterministic service tests added under `tests/runtime/` and a `delete_old_attendance()` function implemented in `app/database/attendance_db.py` that deletes records older than a configurable retention period. A `retention_days` config field (default 365, env var `RETENTION_DAYS`) added to `app/core/config.py`. CLI cleanup command `app auth cleanup --retention-days N` added to `app/auth/cli.py`. Unit test `test_delete_old_attendance` added to `tests/runtime/test_database_queries.py`.
-- **Impact:** Biometric and attendance data may persist indefinitely without configured retention. Without retention policy, storage grows indefinitely.
-- **Proposed fix:** Define retention and deletion workflows, protect storage, restrict access, and document backup handling. Obtain privacy review.
-- **Status:** Partially resolved (deletion function and config field implemented; CLI command and unit tests added; documentation pending).
+- **Evidence:** Live embeddings and the attendance database are stored unencrypted. Attendance and enrollment-audit retention are implemented through `python -m app.auth.cli cleanup --retention-days N`. Backups are encrypted with AES-256-GCM, verified before restore, pruned by age and count, and can be scheduled with `python -m app.database.backup schedule`.
+- **Impact:** Live biometric and attendance data depend on filesystem permissions and host access control. A stolen live disk exposes the embeddings and records. Backups are protected by the passphrase, but a weak passphrase remains a risk.
+- **Proposed fix:** Encrypt or otherwise protect live biometric storage, define key management and access review, and obtain privacy review.
+- **Status:** Partially resolved; backup protection is implemented, live storage protection is not.
 
 ### KI-012 — Per-process, unbounded in-memory sessions
 
-- **Evidence:** `sessions = {}` at `app/api/liveness_routes.py`; sessions are now bound to an authenticated user ID, but abandoned sessions are never removed and there is no shared store or lock.
-- **Impact:** Memory growth; behavior differs with multiple workers/restarts; no cross-process verification.
-- **Proposed fix:** Add expiry cleanup and, if scaling, a shared store with lifecycle management.
-- **Status:** Open.
+- **Evidence:** `sessions = {}` at `app/api/liveness_routes.py`. Sessions are bound to an authenticated user ID and are removed when they expire or are consumed, but an abandoned session that is never submitted again remains until the process restarts. There is no shared store or lock.
+- **Impact:** Slow memory growth from abandoned sessions; behavior differs with multiple workers/restarts; no cross-process verification.
+- **Proposed fix:** Add a background expiry sweep and, if scaling, a shared store with lifecycle management.
+- **Status:** Partially resolved.
 
 ### KI-013 — Duplicate model loading at import
 
@@ -145,7 +145,7 @@ Severity is a triage aid, not a formal risk rating.
 
 ### KI-016 — Hardcoded registration and client values
 
-- **Evidence:** `app/services/register_face.py`, `recognize_face.py`, `combined_test.py`, and `test_api_attendance.py` hardcode `STU001`, image names, API URLs, subject/lecture values, and output paths.
+- **Historical evidence:** `app/services/register_face.py`, `recognize_face.py`, `combined_test.py`, and `test_api_attendance.py` used to hardcode `STU001`, image names, API URLs, subject/lecture values, and output paths.
 - **Impact:** Accidental data overwrite, wrong-student testing, and non-portable paths.
 - **Resolution:** `register_face.py` and `recognize_face.py` are parameterized functions with CLI entry points. Identifiers are validated, destinations are resolved inside the configured embedding directory, existing embeddings are refused without `--overwrite`, and writes are atomic. The manual API client and the manual demo scripts read their values from arguments or environment variables, and the Windows-specific paths were removed.
 - **Status:** Resolved.

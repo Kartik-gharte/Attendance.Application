@@ -78,15 +78,31 @@ Authentication is implemented, but it is a local-account baseline, not a product
 
 ### Logging
 
-The code uses `print()` rather than structured logging. Logs include student IDs, subject/lecture identifiers, filenames, similarity, and error details. There is no log level, redaction, rotation, or retention policy. Do not log raw images, embeddings, session IDs, or credentials.
+Logging is structured, leveled, and redacted. The redaction factory masks
+bearer tokens, passwords, API keys, liveness session identifiers, and
+embedding vectors before any handler receives a record. `student_id` is
+logged at `INFO` for attendance reconciliation and must never be logged
+together with biometric material. Log retention and access belong to the
+process supervisor; the application does not write log files. See
+[CONFIGURATION.md](CONFIGURATION.md) and the logging section below.
 
 ### Storage protection
 
-Embeddings and the attendance database are stored unencrypted on the local filesystem. Filesystem permissions are the only access control. There is no encryption at rest, key management, or backup policy.
+The live embeddings and the attendance database are stored unencrypted on the
+local filesystem; filesystem permissions are the only access control for
+them. Backups are encrypted by default with AES-256-GCM and a
+scrypt-derived key, and the key is never stored beside the backup. Live
+storage encryption and key management remain open work.
 
 ### Data retention and deletion
 
-There is no retention period, deletion endpoint, or subject-access workflow. Deleting a local `data/` directory removes records but is manual and not auditable. A production design needs documented retention, deletion, and backup handling.
+Attendance records, the enrollment audit trail, and old backups are subject
+to retention rules. `python -m app.auth.cli cleanup --retention-days N`
+deletes old attendance rows and audit entries; backups are pruned by age and
+count after each backup. There is no subject-access workflow, and deletion
+is an operator action rather than a user-facing endpoint. A production
+design still needs documented consent, access-review, and deletion
+procedures.
 
 ### Anti-spoofing limitations
 
@@ -94,21 +110,19 @@ The blink check plus face-size, brightness, and sharpness screening is **not** a
 
 ### Consent and legal obligations
 
-Face data is sensitive personal data in many jurisdictions, including regimes such as GDPR, BIPA, and India's DPDP Act. The repository does not include consent notices, privacy notices, retention schedules, or a lawful-basis assessment. Obtain institutional/legal review before collecting real student biometric data. This document is not legal advice.
+Face data is sensitive personal data in many jurisdictions, including regimes such as GDPR, BIPA, and India's DPDP Act. The application records a consent reference for each enrollment, but it does not include consent notices, privacy notices, a biometric-template retention policy, or a lawful-basis assessment. Obtain institutional/legal review before collecting real student biometric data. This document is not legal advice.
 
 ## Recommended remediation order
 
-Identifier validation, embedding-path containment, upload limits, stable error responses, local authentication, and role-based attendance authorization are already implemented. Remaining work:
+Identifier validation, embedding-path containment, upload limits, stable error responses, local authentication, role-based attendance authorization, structured redacted logging, retention and deletion commands, backup encryption, backup retention, and CI secret scanning are already implemented. Remaining work:
 
 1. Add rate limiting, account lockout, and login/authorization audit events.
 2. Move liveness session IDs out of query strings and bind them to a stronger one-time challenge.
-3. Introduce structured, redacted logging.
-4. Add HTTPS, secure deployment configuration, and token handling guidance for clients.
-5. Encrypt or otherwise protect biometric storage; restrict filesystem access.
-6. Define consent, retention, deletion, and access-review policies.
-7. Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
-8. Add dependency and secret scanning to the development workflow.
-9. Consider SSO/institutional identity and MFA before broader deployment.
+3. Add HTTPS, secure deployment configuration, and token handling guidance for clients.
+4. Protect the live biometric storage with encryption or equivalent access controls and key management.
+5. Define consent, access-review, and subject-deletion procedures beyond the recorded consent reference.
+6. Evaluate a trained presentation-attack detection component before claiming anti-spoofing security.
+7. Consider SSO/institutional identity and MFA before broader deployment.
 
 ## Reporting
 
@@ -160,9 +174,9 @@ tamper-evident records of attendance operations.
 
 ## Enrollment consent and authorization
 
-Enrollment writes a biometric template. It is a controlled local operation
-that is not exposed through the API, and it is not reachable by a student
-account.
+Enrollment writes a biometric template. It is a controlled operation
+available through an administrator-only API endpoint and through the local
+CLI. A student account cannot enroll a face, including its own.
 
 Before an enrollment is performed:
 
@@ -189,8 +203,8 @@ Controls that protect the enrollment workflow:
 - the destination is always resolved inside the configured embedding
   directory, and a caller cannot point it elsewhere;
 - an existing embedding is never replaced without an explicit `--overwrite`
-  flag, because replacing it makes the student unverifiable against the
-  previous template;
+  flag or the `overwrite` form field, because replacing it makes the student
+  unverifiable against the previous template;
 - the embedding is written to a temporary file and moved into place only
   after it is complete, so a failure never leaves a corrupt template;
 - the workflow logs operational metadata only. Embedding vectors and image
@@ -249,6 +263,13 @@ templates do not accumulate. A backup is removed when it is older than
 `BACKUP_RETENTION_DAYS` or when it falls outside the newest
 `BACKUP_RETENTION_COUNT` backups. The newest backup is always kept. See
 [DATABASE.md](DATABASE.md).
+
+A schedule can be generated with
+`python -m app.database.backup schedule cron|systemd`. The output contains
+absolute paths and the retention limits, but never the passphrase. The
+systemd service reads `BACKUP_PASSPHRASE` from
+`/etc/attendance/backup.env` when present; that file must be readable only
+by the service account.
 
 ## Health endpoints
 
